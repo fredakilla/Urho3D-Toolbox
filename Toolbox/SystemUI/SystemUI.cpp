@@ -33,8 +33,6 @@
 #include "Utils.h"
 #include <SDL/SDL.h>
 #include <ImGuizmo/ImGuizmo.h>
-#include <imgui/imgui_internal.h>
-#include <imgui/imgui_freetype.h>
 
 
 using namespace std::placeholders;
@@ -328,7 +326,7 @@ void SystemUI::ReallocateFontTexture()
     unsigned char* pixels;
     int width, height;
 
-    ImGuiFreeType::BuildFontAtlas(io.Fonts, ImGuiFreeType::ForceAutoHint);
+    io.Fonts->AddFontDefault();
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     if (fontTexture_.Null())
