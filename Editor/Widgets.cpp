@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 
 #include <Urho3D/IO/Log.h>
 #include <Urho3D/Resource/ResourceCache.h>
-#include <Toolbox/SystemUI/SystemUI.h>
+#include <Urho3D/SystemUI/SystemUI.h>
 #include <Toolbox/SystemUI/Widgets.h>
 #include "EditorIconCache.h"
 #include "Widgets.h"
@@ -34,36 +34,36 @@ namespace ImGui
 
 void Image(const String& name)
 {
-    EditorIconCache* icons = ui::GetSystemUI()->GetSubsystem<EditorIconCache>();
+    auto* icons = ui::GetSystemUI()->GetSubsystem<EditorIconCache>();
 
     if (auto iconData = icons->GetIconData(name))
     {
         IntRect rect = iconData->rect_;
         ResourceCache* cache = ui::GetSystemUI()->GetSubsystem<ResourceCache>();
-        Texture2D* texture = cache->GetResource<Texture2D>(iconData->textureRef_.name_);
-        ui::Image(texture, ToImGui(rect.Size()) * ui::GetPixelPerfectDPIScale(),
+        auto* texture = cache->GetResource<Texture2D>(iconData->textureRef_.name_);
+        ui::Image(texture, {pdpx(rect.Width()), pdpy(rect.Height())},
             {(float) rect.left_ / texture->GetWidth(), (float) rect.top_ / texture->GetHeight()},
             {(float) rect.right_ / texture->GetWidth(), (float) rect.bottom_ / texture->GetHeight()});
     }
     else
-        URHO3D_LOGERRORF("Editor icon \"%s\" does not exist.", name);
+        URHO3D_LOGERRORF("Editor icon \"%s\" does not exist.", name.CString());
 }
 
 bool ImageButton(const String& name)
 {
-    EditorIconCache* icons = ui::GetSystemUI()->GetSubsystem<EditorIconCache>();
+    auto* icons = ui::GetSystemUI()->GetSubsystem<EditorIconCache>();
 
     if (auto iconData = icons->GetIconData(name))
     {
         IntRect rect = iconData->rect_;
         ResourceCache* cache = ui::GetSystemUI()->GetSubsystem<ResourceCache>();
-        Texture2D* texture = cache->GetResource<Texture2D>(iconData->textureRef_.name_);
-        return ui::ImageButton(texture, ToImGui(rect.Size()) * ui::GetPixelPerfectDPIScale(),
+        auto* texture = cache->GetResource<Texture2D>(iconData->textureRef_.name_);
+        return ui::ImageButton(texture, {pdpx(rect.Width()), pdpy(rect.Height())},
             {(float) rect.left_ / texture->GetWidth(), (float) rect.top_ / texture->GetHeight()},
             {(float) rect.right_ / texture->GetWidth(), (float) rect.bottom_ / texture->GetHeight()});
     }
     else
-        URHO3D_LOGERRORF("Editor icon \"%s\" does not exist.", name);
+        URHO3D_LOGERRORF("Editor icon \"%s\" does not exist.", name.CString());
 
     return false;
 }

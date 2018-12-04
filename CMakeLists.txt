@@ -27,5 +27,5 @@ include_directories(ThirdParty .)
 
 add_subdirectory(ThirdParty)
 add_subdirectory(Toolbox)
-#add_subdirectory(Editor)
+add_subdirectory(Editor)
 #add_subdirectory(AssetViewer)

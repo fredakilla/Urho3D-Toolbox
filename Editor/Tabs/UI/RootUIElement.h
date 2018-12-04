@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 
 #include <Urho3D/UI/UIElement.h>
-#include "Editor/Tabs/Tab.h"
+#include "Tabs/Tab.h"
 
 
 namespace Urho3D

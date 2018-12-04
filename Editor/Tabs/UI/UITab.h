@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,23 +25,23 @@
 
 #include <Urho3D/Urho3DAll.h>
 #include <Toolbox/Common/UndoManager.h>
-#include "Editor/Tabs/Tab.h"
+#include "Tabs/BaseResourceTab.h"
 #include "Tabs/UI/RootUIElement.h"
 
 
 namespace Urho3D
 {
 
-class UITab : public Tab
+class UITab : public BaseResourceTab, public IHierarchyProvider, public IInspectorProvider
 {
-    URHO3D_OBJECT(UITab, Tab);
+    URHO3D_OBJECT(UITab, BaseResourceTab);
 public:
     /// Construct.
-    explicit UITab(Context* context, StringHash id, const String& afterDockName, ui::DockSlot_ position);
+    explicit UITab(Context* context);
     /// Render scene hierarchy window.
-    void RenderNodeTree() override;
+    void RenderHierarchy() override;
     /// Render inspector window.
-    void RenderInspector() override;
+    void RenderInspector(const char* filter) override;
     /// Render content of tab window.
     bool RenderWindowContent() override;
     /// Render toolbar buttons.
@@ -49,19 +49,23 @@ public:
     /// Update window when it is active.
     void OnActiveUpdate() override;
     /// Save project data to xml.
-    void SaveProject(XMLElement& tab) override;
+    void OnSaveProject(JSONValue& tab) override;
     /// Load project data from xml.
-    void LoadProject(XMLElement& tab) override;
+    void OnLoadProject(const JSONValue& tab) override;
     /// Load UI layout from resource path.
-    void LoadResource(const String& resourcePath) override;
+    bool LoadResource(const String& resourcePath) override;
     /// Save scene to a resource file.
-    bool SaveResource(const String& resourcePath) override;
+    bool SaveResource() override;
+    ///
+    StringHash GetResourceType() override { return XMLFile::GetTypeStatic(); };
+    /// Called when tab focused.
+    void OnFocused() override;
     /// Return selected UIElement.
     UIElement* GetSelected() const;
 
 protected:
-    /// Set screen rectangle where scene is being rendered.
-    void UpdateViewRect(const IntRect& rect);
+    ///
+    IntRect UpdateViewRect() override;
     /// Render scene hierarchy window.
     void RenderNodeTree(UIElement* element);
     /// Select element. Pass null to unselect current element.
@@ -83,6 +87,8 @@ protected:
     ///
     void AttributeCustomize(VariantMap& args);
 
+    ///
+    SharedPtr<UI> offScreenUI_;
     /// Root element which contains edited UI.
     SharedPtr<RootUIElement> rootElement_;
     /// Texture that UIElement will be rendered into.
@@ -91,8 +97,6 @@ protected:
     bool showInternal_ = false;
 
     WeakPtr<UIElement> selectedElement_;
-    Undo::Manager undo_;
-    String path_;
     bool hideResizeHandles_ = false;
     Vector<String> styleNames_;
     String textureSelectorAttribute_;

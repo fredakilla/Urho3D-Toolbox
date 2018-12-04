@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,35 +25,39 @@
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Toolbox/IO/ContentUtilities.h>
 #include <Toolbox/SystemUI/Widgets.h>
-#include <IconFontCppHeaders/IconsFontAwesome.h>
-#include "Editor/Editor.h"
-#include "Editor/Widgets.h"
+#include <IconFontCppHeaders/IconsFontAwesome5.h>
+#include <ImGui/imgui.h>
+#include <ImGui/imgui_internal.h>
+#include "EditorEvents.h"
+#include "Editor.h"
+#include "Widgets.h"
 #include "UITab.h"
+#include "Tabs/InspectorTab.h"
 
+using namespace ui::litterals;
 
 namespace Urho3D
 {
 
-UITab::UITab(Urho3D::Context* context, Urho3D::StringHash id, const Urho3D::String& afterDockName,
-    ui::DockSlot_ position)
-    : Tab(context, id, afterDockName, position)
-    , undo_(context)
+UITab::UITab(Context* context)
+    : BaseResourceTab(context)
 {
     SetTitle("New UI Layout");
     windowFlags_ = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
-    texture_ = new Texture2D(context);
+    texture_ = new Texture2D(context_);
     texture_->SetFilterMode(FILTER_BILINEAR);
     texture_->SetAddressMode(COORD_U, ADDRESS_CLAMP);
     texture_->SetAddressMode(COORD_V, ADDRESS_CLAMP);
-    texture_->SetNumLevels(1);                                        // No mipmaps
+    texture_->SetNumLevels(1);
 
-    rootElement_ = new RootUIElement(context);
-    rootElement_->SetRenderTexture(texture_);
+    rootElement_ = new RootUIElement(context_);
+    rootElement_->SetTraversalMode(TM_BREADTH_FIRST);
     rootElement_->SetEnabled(true);
 
-    // Prevents crashes due to uninitialized texture.
-    UpdateViewRect({0, 0, 512, 512});
+    offScreenUI_ = new UI(context_);
+    offScreenUI_->SetRoot(rootElement_);
+    offScreenUI_->SetRenderTarget(texture_, Color::BLACK);
 
     undo_.Connect(rootElement_);
     undo_.Connect(&inspector_);
@@ -64,7 +68,7 @@ UITab::UITab(Urho3D::Context* context, Urho3D::StringHash id, const Urho3D::Stri
     AutoLoadDefaultStyle();
 }
 
-void UITab::RenderNodeTree()
+void UITab::RenderHierarchy()
 {
     auto oldSpacing = ui::GetStyle().IndentSpacing;
     ui::GetStyle().IndentSpacing = 10;
@@ -74,7 +78,7 @@ void UITab::RenderNodeTree()
 
 void UITab::RenderNodeTree(UIElement* element)
 {
-    WeakPtr<UIElement> elementRef(element);
+    SharedPtr<UIElement> elementRef(element);
     String name = element->GetName();
     String type = element->GetTypeName();
     String tooltip = "Type: " + type;
@@ -96,17 +100,42 @@ void UITab::RenderNodeTree(UIElement* element)
     ui::Image(element->GetTypeName());
     ui::SameLine();
 
-    if (ui::TreeNodeEx(element, flags, "%s", name.CString()))
+    auto treeExpanded = ui::TreeNodeEx(element, flags, "%s", name.CString());
+
+    if (ui::BeginDragDropSource())
+    {
+        ui::SetDragDropVariant("ptr", (void*)element);
+        ui::Text("%s", name.CString());
+        ui::EndDragDropSource();
+    }
+
+    if (ui::BeginDragDropTarget())
+    {
+        // Reparent by drag&drop, insert as first item
+        const Variant& payload = ui::AcceptDragDropVariant("ptr");
+        if (!payload.IsEmpty())
+        {
+            SharedPtr<UIElement> child((UIElement*)payload.GetVoidPtr());
+            if (child.NotNull() && child != element)
+            {
+                child->Remove();    // Needed for reordering under the same parent.
+                element->InsertChild(0, child);
+            }
+        }
+        ui::EndDragDropTarget();
+    }
+
+    if (treeExpanded)
     {
         if (ui::IsItemHovered())
             ui::SetTooltip("%s", tooltip.CString());
 
         if (ui::IsItemHovered())
         {
-            if (ui::IsMouseClicked(0) || ui::IsMouseClicked(2))
+            if (ui::IsMouseClicked(MOUSEB_LEFT) || ui::IsMouseClicked(MOUSEB_RIGHT))
             {
                 SelectItem(element);
-                if (ui::IsMouseClicked(2))
+                if (ui::IsMouseClicked(MOUSEB_RIGHT))
                     ui::OpenPopup("Element Context Menu");
             }
         }
@@ -126,31 +155,50 @@ void UITab::RenderNodeTree(UIElement* element)
 
         ui::TreePop();
     }
+
+    ImRect bb{ui::GetItemRectMin(), ui::GetItemRectMax()};
+    bb.Min.y = bb.Max.y;
+    bb.Max.y += 2_dpy;
+    if (ui::BeginDragDropTargetCustom(bb, ui::GetID("reorder")))
+    {
+        // Reparent by drag&drop between elements, insert after current item
+        const Variant& payload = ui::AcceptDragDropVariant("ptr");
+        if (!payload.IsEmpty())
+        {
+            SharedPtr<UIElement> child((UIElement*)payload.GetVoidPtr());
+            if (child.NotNull() && child != element)
+            {
+                child->Remove();    // Needed for reordering under the same parent.
+                auto index = element->GetParent()->FindChild(element) + 1;
+                element->GetParent()->InsertChild(index, child);
+            }
+        }
+        ui::EndDragDropTarget();
+    }
 }
 
-void UITab::RenderInspector()
+void UITab::RenderInspector(const char* filter)
 {
     if (auto selected = GetSelected())
-        inspector_.RenderAttributes(selected);
+        RenderAttributes(selected, filter, &inspector_);
 }
 
 bool UITab::RenderWindowContent()
 {
-    IntRect tabRect = ToIntRect(ui::GetCurrentWindow()->InnerRect);
+    RenderToolbarButtons();
+    IntRect tabRect = UpdateViewRect();
 
-    if (tabRect.Width() != texture_->GetWidth() || tabRect.Height() != texture_->GetHeight())
-        UpdateViewRect(tabRect);
-
-    auto& style = ui::GetStyle();
-    ui::SetCursorPos(ui::GetCursorPos() - style.WindowPadding);
-    ui::Image(texture_, ToImGui(tabRect.Size()));
+    ui::SetCursorScreenPos(ToImGui(tabRect.Min()));
+    ImVec2 contentSize = ToImGui(tabRect.Size());
+    ui::BeginChild("UI view", contentSize, false, windowFlags_);
+    ui::Image(texture_, contentSize);
 
     if (auto selected = GetSelected())
     {
         // Render element selection rect, resize handles, and handle element transformations.
         IntRect delta;
         IntRect screenRect(selected->GetScreenPosition() + tabRect.Min(), selected->GetScreenPosition() + selected->GetSize() + tabRect.Min());
-        auto flags = ui::TSF_NONE;
+        ui::TransformSelectorFlags flags = ui::TSF_NONE;
         if (hideResizeHandles_)
             flags |= ui::TSF_HIDEHANDLES;
         if (selected->GetMinSize().x_ == selected->GetMaxSize().x_)
@@ -164,7 +212,7 @@ bool UITab::RenderWindowContent()
             IntVector2 resizeStartPos_;
             IntVector2 resizeStartSize_;
         };
-        State* s = ui::GetUIState<State>();
+        auto* s = ui::GetUIState<State>();
 
         if (ui::TransformRect(screenRect, delta, flags))
         {
@@ -181,39 +229,39 @@ bool UITab::RenderWindowContent()
         if (s->resizeActive_ && !ui::IsItemActive())
         {
             s->resizeActive_ = false;
-            undo_.TrackState(selected, "Position", selected->GetPosition(), s->resizeStartPos_);
-            undo_.TrackState(selected, "Size", selected->GetSize(), s->resizeStartSize_);
+            undo_.Track<Undo::EditAttributeAction>(selected, "Position", s->resizeStartPos_, selected->GetPosition());
+            undo_.Track<Undo::EditAttributeAction>(selected, "Size", s->resizeStartSize_, selected->GetSize());
         }
     }
 
     RenderRectSelector();
+    ui::EndChild();
 
     return true;
 }
 
 void UITab::RenderToolbarButtons()
 {
-    if (ui::Button(ICON_FA_UNDO))
-        undo_.Undo();
+    ui::StyleVarScope frameRoundingMod(ImGuiStyleVar_FrameRounding, 0);
 
-    if (ui::IsItemHovered())
-        ui::SetTooltip("Undo.");
-    ui::SameLine();
+    if (ui::EditorToolbarButton(ICON_FA_SAVE, "Save"))
+        SaveResource();
 
-    if (ui::Button(ICON_FA_REPEAT))
-        undo_.Redo();
+    ui::SameLine(0, 3.f);
 
-    if (ui::IsItemHovered())
-        ui::SetTooltip("Redo.");
-
-    ui::SameLine();
+//    if (ui::EditorToolbarButton(ICON_FA_UNDO, "Undo"))
+//        undo_.Undo();
+//    if (ui::EditorToolbarButton(ICON_FA_REDO, "Redo"))
+//        undo_.Redo();
+//
+//    ui::SameLine(0, 3.f);
 
     ui::Checkbox("Show Internal", &showInternal_);
     ui::SameLine();
-
     ui::Checkbox("Hide Resize Handles", &hideResizeHandles_);
-    ui::SameLine();
 
+    ui::SameLine(0, 3.f);
+    ui::SetCursorPosY(ui::GetCursorPosY() + 4_dpx);
 }
 
 void UITab::OnActiveUpdate()
@@ -221,14 +269,6 @@ void UITab::OnActiveUpdate()
     Input* input = GetSubsystem<Input>();
     if (!ui::IsAnyItemActive())
     {
-        if (input->GetKeyDown(KEY_CTRL))
-        {
-            if (input->GetKeyPress(KEY_Y) || (input->GetKeyDown(KEY_SHIFT) && input->GetKeyPress(KEY_Z)))
-                undo_.Redo();
-            else if (input->GetKeyPress(KEY_Z))
-                undo_.Undo();
-        }
-
         if (auto selected = GetSelected())
         {
             if (input->GetKeyPress(KEY_DELETE))
@@ -244,9 +284,9 @@ void UITab::OnActiveUpdate()
     {
         if (input->GetMouseButtonPress(MOUSEB_LEFT) || input->GetMouseButtonPress(MOUSEB_RIGHT))
         {
-            auto pos = input->GetMousePosition();
-            auto clicked = GetSubsystem<UI>()->GetElementAt(pos, false);
-            if (!clicked && rootElement_->GetCombinedScreenRect().IsInside(pos) == INSIDE && !ui::IsAnyWindowHovered())
+            IntVector2 pos = rootElement_->ScreenToElement(input->GetMousePosition());
+            UIElement* clicked = offScreenUI_->GetElementAt(pos, false);
+            if (!clicked && rootElement_->GetCombinedScreenRect().IsInside(pos) == INSIDE && !ui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
                 clicked = rootElement_;
 
             if (clicked)
@@ -262,66 +302,95 @@ void UITab::OnActiveUpdate()
     RenderElementContextMenu();
 }
 
-void UITab::UpdateViewRect(const IntRect& rect)
+IntRect UITab::UpdateViewRect()
 {
-    if (texture_->SetSize(rect.Width(), rect.Height(), GetSubsystem<Graphics>()->GetRGBAFormat(),
-        TEXTURE_RENDERTARGET))
-    {
-        rootElement_->SetSize(rect.Width(), rect.Height());
-        rootElement_->SetOffset(rect.Min());
-        texture_->GetRenderSurface()->SetUpdateMode(SURFACE_UPDATEALWAYS);
-    }
-    else
-        URHO3D_LOGERROR("UITab: resizing texture failed.");
+    IntRect rect = BaseClassName::UpdateViewRect();
+    // Correct content rect to not overlap buttons. Ideally this should be in Tab.cpp but for some reason it creates
+    // unused space at the bottom of PreviewTab.
+    rect.top_ += static_cast<int>(ui::GetCursorPosY());
 
+    if (rect.Width() != texture_->GetWidth() || rect.Height() != texture_->GetHeight())
+    {
+        rootElement_->SetOffset(rect.Min());
+        offScreenUI_->SetCustomSize(rect.Width(), rect.Height());
+    }
+
+    return rect;
 }
 
-void UITab::LoadResource(const String& resourcePath)
+bool UITab::LoadResource(const String& resourcePath)
 {
+    if (!BaseClassName::LoadResource(resourcePath))
+        return false;
+
     if (GetContentType(resourcePath) != CTYPE_UILAYOUT)
     {
         URHO3D_LOGERRORF("%s is not a UI layout.", resourcePath.CString());
-        return;
+        return false;
     }
 
+    undo_.Clear();
+    undo_.SetTrackingEnabled(false);
+
     auto cache = GetSubsystem<ResourceCache>();
+    rootElement_->RemoveAllChildren();
 
-    SharedPtr<XMLFile> xml(new XMLFile(context_));
-    if (xml->Load(*cache->GetFile(resourcePath)))
+    UIElement* layoutElement = nullptr;
+    if (resourcePath.EndsWith(".xml"))
     {
-        Vector<SharedPtr<UIElement>> children = rootElement_->GetChildren();
-        auto child = rootElement_->CreateChild(xml->GetRoot().GetAttribute("type"));
-        if (child->LoadXML(xml->GetRoot()))
+        SharedPtr<XMLFile> file(cache->GetResource<XMLFile>(resourcePath));
+        if (file.NotNull())
         {
-            child->SetStyleAuto();
-            SetTitle(GetFileName(resourcePath));
-
-            // Must be disabled because it interferes with ui element resizing
-            if (auto window = dynamic_cast<Window*>(child))
-            {
-                window->SetMovable(false);
-                window->SetResizable(false);
-            }
-
-            path_ = resourcePath;
-
-            for (const auto& oldChild : children)
-                oldChild->Remove();
-
-            undo_.Clear();
+            String type = file->GetRoot().GetAttribute("type");
+            if (type.Empty())
+                type = "UIElement";
+            auto* child = rootElement_->CreateChild(StringHash(type));
+            if (child->LoadXML(file->GetRoot()))
+                layoutElement = child;
+            else
+                child->Remove();
         }
         else
         {
-            child->Remove();
-            URHO3D_LOGERRORF("Loading UI layout %s failed.", resourcePath.CString());
+            URHO3D_LOGERRORF("Loading file %s failed.", resourcePath.CString());
+            cache->ReleaseResource(XMLFile::GetTypeStatic(), resourcePath, true);
+            return false;
         }
     }
     else
-        URHO3D_LOGERRORF("Loading file %s failed.", resourcePath.CString());
+    {
+        URHO3D_LOGERROR("Unsupported format.");
+        cache->ReleaseResource(XMLFile::GetTypeStatic(), resourcePath, true);
+        return false;
+    }
+
+    if (layoutElement != nullptr)
+    {
+        layoutElement->SetStyleAuto();
+
+        // Must be disabled because it interferes with ui element resizing
+        if (auto* window = layoutElement->Cast<Window>())
+        {
+            window->SetMovable(false);
+            window->SetResizable(false);
+        }
+    }
+    else
+    {
+        URHO3D_LOGERRORF("Loading UI layout %s failed.", resourcePath.CString());
+        cache->ReleaseResource(XMLFile::GetTypeStatic(), resourcePath, true);
+        return false;
+    }
+
+    undo_.SetTrackingEnabled(true);
+    return true;
 }
 
-bool UITab::SaveResource(const String& resourcePath)
+bool UITab::SaveResource()
 {
+    if (!BaseClassName::SaveResource())
+        return false;
+
     if (rootElement_->GetNumChildren() < 1)
         return false;
 
@@ -330,36 +399,52 @@ bool UITab::SaveResource(const String& resourcePath)
         return false;
 
     ResourceCache* cache = GetSubsystem<ResourceCache>();
+    String savePath = cache->GetResourceFileName(resourceName_);
+    cache->ReleaseResource(XMLFile::GetTypeStatic(), resourceName_);
 
-    String savePath = cache->GetResourceFileName(resourcePath.Empty() ? path_ : resourcePath);
-    XMLFile xml(context_);
-    XMLElement root = xml.CreateRoot("element");
-    if (rootElement_->GetChild(0)->SaveXML(root))
+    if (resourceName_.EndsWith(".xml"))
     {
-        // Remove internal UI elements
-        auto result = root.SelectPrepared(XPathQuery("//element[@internal=\"true\"]"));
-        for (auto el = result.FirstResult(); el.NotNull(); el = el.NextResult())
-            el.GetParent().RemoveChild(el);
-
-        // Remove style="none"
-        root.SelectPrepared(XPathQuery("//element[@style=\"none\"]"));
-        for (auto el = result.FirstResult(); el.NotNull(); el = el.NextResult())
-            el.RemoveAttribute("style");
-
-        // TODO: remove attributes with values matching style
-        // TODO: remove attributes with default values
-
-        File saveFile(context_, savePath, FILE_WRITE);
-        if (xml.Save(saveFile))
+        XMLFile xml(context_);
+        XMLElement root = xml.CreateRoot("element");
+        if (rootElement_->GetChild(0)->SaveXML(root))
         {
-            if (!resourcePath.Empty())
-                path_ = resourcePath;
+            // Remove internal UI elements
+            auto result = root.SelectPrepared(XPathQuery("//element[@internal=\"true\"]"));
+            for (auto el = result.FirstResult(); el.NotNull(); el = el.NextResult())
+            {
+                // Remove only top level internal elements.
+                bool internalParent = false;
+                auto parent = el.GetParent();
+                do
+                {
+                    internalParent = parent.HasAttribute("internal") && parent.GetAttribute("internal") == "true";
+                    parent = parent.GetParent();
+                } while (!internalParent && parent.NotNull());
+
+                if (!internalParent)
+                    el.Remove();
+            }
+
+            // Remove style="none"
+            result = root.SelectPrepared(XPathQuery("//element[@style=\"none\"]"));
+            for (auto el = result.FirstResult(); el.NotNull(); el = el.NextResult())
+                el.RemoveAttribute("style");
+
+            // TODO: remove attributes with values matching style
+            // TODO: remove attributes with default values
+
+            File saveFile(context_, savePath, FILE_WRITE);
+            if (!xml.Save(saveFile))
+                return false;
         }
         else
             return false;
     }
     else
+    {
+        URHO3D_LOGERROR("Unsupported format.");
         return false;
+    }
 
     // Save style
     savePath = cache->GetResourceFileName(styleFile->GetName());
@@ -367,8 +452,7 @@ bool UITab::SaveResource(const String& resourcePath)
     if (!styleFile->Save(saveFile))
         return false;
 
-    if (!path_.Empty())
-        SetTitle(GetFileName(path_));
+    SendEvent(E_EDITORRESOURCESAVED);
 
     return true;
 }
@@ -406,7 +490,7 @@ void UITab::AutoLoadDefaultStyle()
             // Icons file is also a style file. Without this ugly workaround sometimes wrong style gets applied.
             if (GetContentType(resourcePath) == CTYPE_UISTYLE && !resourcePath.EndsWith("Icons.xml"))
             {
-                XMLFile* style = cache->GetResource<XMLFile>(resourcePath);
+                auto* style = cache->GetResource<XMLFile>(resourcePath);
                 rootElement_->SetDefaultStyle(style);
 
                 auto styles = style->GetRoot().SelectPrepared(XPathQuery("/elements/element"));
@@ -482,18 +566,14 @@ void UITab::RenderElementContextMenu()
     }
 }
 
-void UITab::SaveProject(XMLElement& tab)
+void UITab::OnSaveProject(JSONValue& tab)
 {
-    tab.SetAttribute("type", "ui");
-    tab.SetAttribute("id", id_.ToString().CString());
-    tab.SetAttribute("path", path_);
-    Tab::SaveResource();
+    BaseClassName::OnSaveProject(tab);
 }
 
-void UITab::LoadProject(XMLElement& tab)
+void UITab::OnLoadProject(const JSONValue& tab)
 {
-    id_ = StringHash(ToUInt(tab.GetAttribute("id"), 16));
-    LoadResource(tab.GetAttribute("path"));
+    BaseClassName::OnLoadProject(tab);
 }
 
 String UITab::GetAppliedStyle(UIElement* element)
@@ -512,7 +592,7 @@ String UITab::GetAppliedStyle(UIElement* element)
 
 void UITab::RenderRectSelector()
 {
-    BorderImage* selected = dynamic_cast<BorderImage*>(GetSelected());
+    auto* selected = GetSelected() ? GetSelected()->Cast<BorderImage>() : nullptr;
 
     if (textureSelectorAttribute_.Empty() || selected == nullptr)
         return;
@@ -525,7 +605,7 @@ void UITab::RenderRectSelector()
         int windowFlags_ = ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar;
         IntRect rectWindowDeltaAccumulator_;
     };
-    State* s = ui::GetUIState<State>();
+    auto* s = ui::GetUIState<State>();
 
     bool open = true;
     auto texture = selected->GetTexture();
@@ -598,8 +678,8 @@ void UITab::RenderRectSelector()
         else if (s->isResizing_)
         {
             s->isResizing_ = false;
-            undo_.TrackState(selected, textureSelectorAttribute_,
-                selectedElement_->GetAttribute(textureSelectorAttribute_), s->startRect_);
+            undo_.Track<Undo::EditAttributeAction>(selected, textureSelectorAttribute_, s->startRect_,
+                selected->GetAttribute(textureSelectorAttribute_));
         }
     }
     ui::End();
@@ -661,7 +741,7 @@ void UITab::AttributeMenu(VariantMap& args)
 
     if (auto selected = GetSelected())
     {
-        auto* item = dynamic_cast<Serializable*>(args[P_SERIALIZABLE].GetPtr());
+        auto* item = static_cast<Serializable*>(args[P_SERIALIZABLE].GetPtr());
         auto* info = static_cast<AttributeInfo*>(args[P_ATTRIBUTEINFO].GetVoidPtr());
 
         Variant value = item->GetAttribute(info->name_);
@@ -676,9 +756,9 @@ void UITab::AttributeMenu(VariantMap& args)
             {
                 if (ui::MenuItem("Reset to style"))
                 {
-                    undo_.TrackState(item, info->name_, styleVariant, value);
                     item->SetAttribute(info->name_, styleVariant);
                     item->ApplyAttributes();
+                    undo_.Track<Undo::EditAttributeAction>(item, info->name_, value, item->GetAttribute(info->name_));
                 }
             }
 
@@ -688,16 +768,11 @@ void UITab::AttributeMenu(VariantMap& args)
                 {
                     if (styleAttribute.IsNull())
                     {
-                        //styleAttribute = undo_.XMLCreate(styleXml, "attribute");
                         styleAttribute = styleXml.CreateChild("attribute");
                         styleAttribute.SetAttribute("name", info->name_);
-                        styleAttribute.SetVariantValue(value);
                     }
-                    else
-                    {
-                        undo_.XMLSetVariantValue(styleAttribute, styleAttribute.GetVariantValue(info->type_));
-                        undo_.XMLSetVariantValue(styleAttribute, value);
-                    }
+                    // To save some writing undo system performs value update action as well.
+                    undo_.Track<Undo::EditUIStyleAction>(selected, styleAttribute, value);
                 }
             }
         }
@@ -706,12 +781,12 @@ void UITab::AttributeMenu(VariantMap& args)
         {
             if (ui::MenuItem("Remove from style"))
             {
-                styleAttribute.Remove();
-                // undo_.XMLRemove(styleAttribute);
+                // To save some writing undo system performs value update action as well. Empty variant means removal.
+                undo_.Track<Undo::EditUIStyleAction>(selected, styleAttribute, Variant::EMPTY);
             }
         }
 
-        if (info->type_ == VAR_INTRECT && dynamic_cast<BorderImage*>(selected) != nullptr)
+        if (info->type_ == VAR_INTRECT && selected->IsInstanceOf<BorderImage>())
         {
             if (ui::MenuItem("Select in UI Texture"))
                 textureSelectorAttribute_ = info->name_;
@@ -726,7 +801,7 @@ void UITab::AttributeCustomize(VariantMap& args)
 
     using namespace AttributeInspectorAttribute;
 
-    auto* item = dynamic_cast<Serializable*>(args[P_SERIALIZABLE].GetPtr());
+    auto* item = static_cast<Serializable*>(args[P_SERIALIZABLE].GetPtr());
     auto* info = static_cast<AttributeInfo*>(args[P_ATTRIBUTEINFO].GetVoidPtr());
 
     Variant value = item->GetAttribute(info->name_);
@@ -748,6 +823,10 @@ void UITab::AttributeCustomize(VariantMap& args)
             args[P_TOOLTIP] = "Style value was modified.";
         }
     }
+}
+
+void UITab::OnFocused()
+{
 }
 
 }

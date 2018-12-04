@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,10 +23,9 @@
 #pragma once
 
 
-#include <Urho3D/Urho3DAll.h>
+#include <Urho3D/Engine/Application.h>
 #include <Toolbox/SystemUI/AttributeInspector.h>
-#include "Editor/Tabs/UI/UITab.h"
-#include "IDPool.h"
+#include "Project.h"
 
 using namespace std::placeholders;
 
@@ -35,6 +34,9 @@ namespace Urho3D
 
 class Tab;
 class SceneTab;
+class AssetConverter;
+
+static const unsigned EDITOR_VIEW_LAYER = 1U << 31;
 
 class Editor : public Application
 {
@@ -49,38 +51,75 @@ public:
     /// Tear down editor application.
     void Stop() override;
 
-    /// Save editor configuration.
-    void SaveProject(const String& filePath);
-    /// Load saved editor configuration.
-    void LoadProject(const String& filePath);
     /// Renders UI elements.
     void OnUpdate(VariantMap& args);
     /// Renders menu bar at the top of the screen.
     void RenderMenuBar();
     /// Create a new tab of specified type.
-    /// \param project is xml element containing serialized project data produced by SceneTab::SaveProject()
+    template<typename T> T* CreateTab() { return (T*)CreateTab(T::GetTypeStatic()); }
+    /// Create a new tab of specified type.
+    Tab* CreateTab(StringHash type);
+    /// Get tab that has resource opened or create new one and open said resource.
+    Tab* GetOrCreateTab(StringHash type, const String& resourceName);
+    /// Return tab of specified type.
+    Tab* GetTab(StringHash type, const String& resourceName=String::EMPTY);
+    /// Return tab of specified type.
     template<typename T>
-    T* CreateNewTab(XMLElement project=XMLElement());
+    T* GetTab(const String& resourceName=String::EMPTY) { return static_cast<T*>(GetTab(T::GetTypeStatic(), resourceName)); }
     /// Return active scene tab.
     Tab* GetActiveTab() { return activeTab_; }
     /// Return currently open scene tabs.
     const Vector<SharedPtr<Tab>>& GetSceneViews() const { return tabs_; }
-    /// Return a list of object categories registered with engine.
-    StringVector GetObjectCategories() const;
     /// Return a map of names and type hashes from specified category.
     StringVector GetObjectsByCategory(const String& category);
 
+    /// Returns a list of open content tabs/docks/windows. This list does not include utility docks/tabs/windows.
+    const Vector<SharedPtr<Tab>>& GetContentTabs() const { return tabs_; }
+    /// Opens project or creates new one.
+    void OpenProject(const String& projectPath);
+    /// Close current project.
+    void CloseProject();
+    /// Return path containing data directories of engine.
+    const String& GetCoreResourcePrefixPath() const { return coreResourcePrefixPath_; }
+    /// Load default tab layout.
+    void LoadDefaultLayout();
+    /// Returns ID of root dockspace.
+    ImGuiID GetDockspaceID() const { return dockspaceId_; }
+    /// Returns pointer to last active scene tab. Returns null if no scene was opened or if last opened scene was closed.
+    SceneTab* GetSceneTab() const { return sceneTab_.Get(); }
+    ///
+    ImFont* GetMonoSpaceFont() const { return monoFont_; }
+
 protected:
-    /// Pool tracking availability of unique IDs used by editor.
-    IDPool idPool_;
+    /// Process console commands.
+    void OnConsoleCommand(VariantMap& args);
+    /// Process any global hotkeys.
+    void HandleHotkeys();
+    /// Renders a project plugins submenu.
+    void RenderProjectMenu();
+    ///
+    void SetupSystemUI();
+
     /// List of active scene tabs.
     Vector<SharedPtr<Tab>> tabs_;
     /// Last focused scene tab.
     WeakPtr<Tab> activeTab_;
-    /// Path to a project file.
-    String projectFilePath_;
-    /// Flag which opens resource browser window.
-    bool resourceBrowserWindowOpen_ = true;
+    /// Current scene tab.
+    WeakPtr<SceneTab> sceneTab_;
+    /// Prefix path of CoreData and EditorData.
+    String coreResourcePrefixPath_;
+    /// Currently loaded project.
+    SharedPtr<Project> project_;
+    /// ID of dockspace root.
+    ImGuiID dockspaceId_;
+    /// Path to a project that editor should open on the end of the frame.
+    String pendingOpenProject_;
+    /// Flag indicating that editor should create and load default layout.
+    bool loadDefaultLayout_ = false;
+    ///
+    ImFont* monoFont_ = nullptr;
+    ///
+    bool exiting_ = false;
 };
 
 }

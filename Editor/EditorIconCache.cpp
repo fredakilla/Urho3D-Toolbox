@@ -1,4 +1,13 @@
 //
+// Copyright (c) 2018 Rokas Kupstys
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
 //
@@ -14,7 +23,7 @@
 #include <Urho3D/IO/Log.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Resource/XMLFile.h>
-#include <Toolbox/SystemUI/SystemUI.h>
+#include <SystemUI/SystemUI.h>
 #include <Toolbox/SystemUI/Widgets.h>
 #include "EditorIconCache.h"
 
@@ -26,7 +35,7 @@ EditorIconCache::EditorIconCache(Context* context)
     : Object(context)
 {
     ResourceCache* cache = ui::GetSystemUI()->GetSubsystem<ResourceCache>();
-    XMLFile* icons = cache->GetResource<XMLFile>("UI/EditorIcons.xml");
+    auto* icons = cache->GetResource<XMLFile>("UI/EditorIcons.xml");
     if (icons == nullptr)
         return;
 
@@ -66,7 +75,7 @@ EditorIconCache::IconData* EditorIconCache::GetIconData(const String& name)
     auto it = iconCache_.Find(name);
     if (it != iconCache_.End())
         return &it->second_;
-    return nullptr;
+    return &iconCache_.Find("Unknown")->second_;
 }
 
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,50 +23,52 @@
 #pragma once
 
 
-#include <Urho3D/Math/MathDefs.h>
-#include <Urho3D/Core/StringUtils.h>
+#include <Urho3D/Container/Ptr.h>
 
 
 namespace Urho3D
 {
 
-class IDPool
+/// Machinery for avoid dynamic_cast<> on every frame.
+template<typename T>
+struct CachedInterfacePtr
 {
-public:
-    /// Allocate new unique id.
-    StringHash NewID()
+    void Update(RefCounted* instance)
     {
-        for (;;)
+        if (instance == nullptr)
         {
-            unsigned hashValue = 0;
-            hashValue |= Random(0x10000);
-            hashValue |= Random(0x10000) << 16;
-
-            StringHash hash(hashValue);
-            if (TakeID(hash))
-                return hash;
+            lastInstance_ = interfaceInstance_ = nullptr;
+            interface_ = nullptr;
+            return;
         }
-        assert(false);
+
+        if (lastInstance_ == instance)
+            return;
+
+        lastInstance_ = instance;
+
+        if (interfaceInstance_ != instance)
+        {
+            if (T* interface = dynamic_cast<T*>(instance))
+            {
+                interfaceInstance_ = instance;
+                interface_ = interface;
+            }
+        }
     }
 
-    /// Mark id as taken.
-    bool TakeID(StringHash id)
+    operator bool()
     {
-        if (pool_.Contains(id))
-            return false;
-
-        pool_.Push(id);
-        return true;
+        return !interfaceInstance_.Expired() && interface_ != nullptr;
     }
 
-    /// Clear all taken ids.
-    void Clear()
-    {
-        pool_.Clear();
-    }
+    T* operator ->() { return interface_; }
+    T* operator &() { return interface_; }
 
 protected:
-    PODVector<StringHash> pool_;
+    WeakPtr<RefCounted> lastInstance_;
+    WeakPtr<RefCounted> interfaceInstance_;
+    T* interface_;
 };
 
 }

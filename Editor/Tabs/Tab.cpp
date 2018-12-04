@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,70 +20,191 @@
 // THE SOFTWARE.
 //
 
+#include <Urho3D/Core/ProcessUtils.h>
 #include <Urho3D/Input/Input.h>
+#include "EditorEvents.h"
+#include "Editor.h"
 #include "Tab.h"
+#include "PreviewTab.h"
 
 
 namespace Urho3D
 {
 
 
-Tab::Tab(Context* context, StringHash id, const String& afterDockName, ui::DockSlot_ position)
-    : Object(context)
+Tab::Tab(Context* context)
+    : ToolBoxObject(context)
     , inspector_(context)
-    , placeAfter_(afterDockName)
-    , placePosition_(position)
-    , id_(id)
 {
+    SetID(GenerateUUID());
 
+    SubscribeToEvent(E_EDITORPROJECTSAVING, [&](StringHash, VariantMap& args) {
+        using namespace EditorProjectSaving;
+        JSONValue& root = *(JSONValue*)args[P_ROOT].GetVoidPtr();
+        auto& tabs = root["tabs"];
+        JSONValue tab;
+        OnSaveProject(tab);
+        tabs.Push(tab);
+    });
+}
+
+Tab::~Tab()
+{
+    SendEvent(E_EDITORTABCLOSED, EditorTabClosed::P_TAB, this);
 }
 
 bool Tab::RenderWindow()
 {
-    bool open = true;
-
     Input* input = GetSubsystem<Input>();
     if (input->IsMouseVisible())
         lastMousePosition_ = input->GetMousePosition();
 
-    ui::SetNextDockPos(placeAfter_.CString(), placePosition_, ImGuiCond_FirstUseEver);
-    if (ui::BeginDock(uniqueTitle_.CString(), &open, windowFlags_))
+    if (autoPlace_)
     {
-        if (open)
+        autoPlace_ = false;
+
+        // Find empty dockspace
+        std::function<ImGuiDockNode*(ImGuiDockNode*)> returnTargetDockspace = [&](ImGuiDockNode* dock) -> ImGuiDockNode* {
+            if (dock == nullptr)
+                return nullptr;
+            if (dock->IsCentralNode)
+                return dock;
+            else if (auto* node = returnTargetDockspace(dock->ChildNodes[0]))
+                return node;
+            else if (auto* node = returnTargetDockspace(dock->ChildNodes[1]))
+                return node;
+            return nullptr;
+        };
+
+        ImGuiID targetID = 0;
+        ImGuiDockNode* dockspaceRoot = ui::DockBuilderGetNode(GetSubsystem<Editor>()->GetDockspaceID());
+        ImGuiDockNode* currentRoot = returnTargetDockspace(dockspaceRoot);
+        if (currentRoot->Windows.empty())
         {
-            IntRect tabRect = ToIntRect(ui::GetCurrentWindow()->InnerRect);
-            if (tabRect.IsInside(lastMousePosition_) == INSIDE)
-            {
-                if (!ui::IsWindowFocused() && ui::IsItemHovered() && input->GetMouseButtonDown(MOUSEB_RIGHT))
-                    ui::SetWindowFocus();
-
-                if (ui::IsDockActive())
-                    isActive_ = ui::IsWindowFocused();
-                else
-                    isActive_ = false;
-            }
-            else
-                isActive_ = false;
-
-            open = RenderWindowContent();
-
-            isRendered_ = true;
+            // Free space exists, dock new window there.
+            targetID = currentRoot->ID;
         }
+        else
+        {
+            // Find biggest window and dock to it as a tab.
+            auto tabs = GetSubsystem<Editor>()->GetContentTabs();
+            float maxSize = 0;
+            for (auto& tab : tabs)
+            {
+                if (tab->GetUniqueTitle() == uniqueTitle_)
+                    continue;
+
+                if (auto* window = ui::FindWindowByName(tab->GetUniqueTitle().CString()))
+                {
+                    float thisWindowSize = window->Size.x * window->Size.y;
+                    if (thisWindowSize > maxSize)
+                    {
+                        maxSize = thisWindowSize;
+                        targetID = window->DockId;
+                    }
+                }
+            }
+        }
+
+        if (targetID)
+            ui::SetNextWindowDockId(targetID, ImGuiCond_Once);
+    }
+    bool wasRendered = isRendered_;
+    wasOpen_ = open_;
+    if (open_)
+    {
+        OnBeforeBegin();
+
+        if (IsModified())
+            windowFlags_ |= ImGuiWindowFlags_UnsavedDocument;
+        else
+            windowFlags_ &= ~ImGuiWindowFlags_UnsavedDocument;
+
+        ui::Begin(uniqueTitle_.CString(), &open_, windowFlags_);
+        {
+            OnAfterBegin();
+            if (!ui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows))
+            {
+                if (!wasRendered)                                                                                   // Just activated
+                    ui::SetWindowFocus();
+                else if (input->IsMouseVisible() && ui::IsAnyMouseDown())
+                {
+                    if (ui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))                                        // Interacting
+                        ui::SetWindowFocus();
+                }
+            }
+
+            isActive_ = ui::IsWindowFocused();
+            bool shouldBeOpen = RenderWindowContent();
+            if (open_)
+                open_ = shouldBeOpen;
+            else
+            {
+                // Tab is possibly closing, lets not override that condition.
+            }
+            isRendered_ = true;
+            OnBeforeEnd();
+        }
+
+        ui::End();
+        OnAfterEnd();
     }
     else
     {
         isActive_ = false;
         isRendered_ = false;
     }
-    ui::EndDock();
 
-    return open;
+    if (activateTab_)
+    {
+        ui::SetWindowFocus();
+        open_ = true;
+        isActive_ = true;
+        activateTab_ = false;
+    }
+
+    return open_;
 }
 
 void Tab::SetTitle(const String& title)
 {
     title_ = title;
-    uniqueTitle_ = ToString("%s###%s", title.CString(), id_.ToString().CString());
+    UpdateUniqueTitle();
 }
+
+void Tab::UpdateUniqueTitle()
+{
+    uniqueTitle_ = ToString("%s###%s", title_.CString(), id_.CString());
+}
+
+IntRect Tab::UpdateViewRect()
+{
+    IntRect tabRect = ToIntRect(ui::GetCurrentWindow()->InnerClipRect);
+    return tabRect;
+}
+
+void Tab::OnSaveProject(JSONValue& tab)
+{
+    tab["type"] = GetTypeName();
+    tab["uuid"] = GetID();
+}
+
+void Tab::OnLoadProject(const JSONValue& tab)
+{
+    SetID(tab["uuid"].GetString());
+}
+
+bool Tab::LoadResource(const String& resourcePath)
+{
+    // Resource loading is only allowed when scene is not playing.
+    return GetSubsystem<Editor>()->GetTab<PreviewTab>()->GetSceneSimulationStatus() == SCENE_SIMULATION_STOPPED;
+}
+
+bool Tab::SaveResource()
+{
+    // Resource loading is only allowed when scene is not playing.
+    return GetSubsystem<Editor>()->GetTab<PreviewTab>()->GetSceneSimulationStatus() == SCENE_SIMULATION_STOPPED;
+}
+
 
 }
