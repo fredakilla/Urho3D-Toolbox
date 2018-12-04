@@ -745,12 +745,12 @@ bool AttributeInspector::RenderResourceRef(StringHash type, const String& name, 
     {
         if (ui::DroppedOnItem())
         {
-            Variant dragData = GetSubsystem<SystemUI>()->GetDragData();
+            /*Variant dragData = GetSubsystem<SystemUI>()->GetDragData();
 
             if (dragData.GetType() == VAR_STRING)
                 resource = cache->GetResource(resourceType, dragData.GetString());
             else if (dragData.GetType() == VAR_RESOURCEREF)
-                resource = cache->GetResource(resourceType, dragData.GetResourceRef().name_);
+                resource = cache->GetResource(resourceType, dragData.GetResourceRef().name_);*/
 
             return resource.NotNull();
         }

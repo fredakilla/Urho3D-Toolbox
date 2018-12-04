@@ -138,7 +138,7 @@ int DoubleClickSelectable(const char* label, bool selected, ImGuiSelectableFlags
 
 bool DroppedOnItem()
 {
-    return ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && ui::GetSystemUI()->HasDragData() && !ui::IsMouseDown(0);
+    //return ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && ui::GetSystemUI()->HasDragData() && !ui::IsMouseDown(0);
 }
 
 bool CollapsingHeaderSimple(const char* label, ImGuiTreeNodeFlags flags)
@@ -367,8 +367,8 @@ bool TransformRect(Urho3D::IntRect& inOut, Urho3D::IntRect& delta, TransformSele
         }
 
         // Prevent interaction when something else blocks inactive transform.
-        if (s->resizing_ != RESIZE_NONE || (ui::IsItemHovered(ImGuiHoveredFlags_RectOnly) &&
-            (!ui::IsAnyWindowHovered() || ui::IsWindowHovered())))
+        if (s->resizing_ != RESIZE_NONE || (ui::IsItemHovered(ImGuiHoveredFlags_RectOnly))) /*&&
+            (!ui::IsAnyWindowHovered() || ui::IsWindowHovered())))*/
         {
             // Set mouse cursor if handle is hovered or if we are resizing
             if (resizing != RESIZE_NONE && !s->ownsCursor_)

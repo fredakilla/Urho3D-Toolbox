@@ -21,10 +21,11 @@
 // THE SOFTWARE.
 //
 
-#include "Urho3D/Core/Context.h"
-#include "Urho3D/Core/CoreEvents.h"
-#include "Urho3D/Graphics/Graphics.h"
-#include "Urho3D/IO/Log.h"
+#include <Urho3D/Core/Context.h>
+#include <Urho3D/Core/CoreEvents.h>
+#include <Urho3D/Graphics/Graphics.h>
+#include <Urho3D/IO/Log.h>
+
 #include "SystemUIEvents.h"
 #include "SystemUI.h"
 #include "SystemMessageBox.h"
@@ -47,7 +48,6 @@ SystemMessageBox::SystemMessageBox(Context* context, const String& messageString
 
 SystemMessageBox::~SystemMessageBox()
 {
-    UnsubscribeFromAllEvents();
 }
 
 void SystemMessageBox::RegisterObject(Context* context)
@@ -104,7 +104,6 @@ void SystemMessageBox::RenderFrame(StringHash eventType, VariantMap& eventData)
         if (closeWindow)
         {
             SendEvent(E_MESSAGEACK, P_OK, status);
-            UnsubscribeFromAllEvents();
             isOpen_ = false;
         }
     }

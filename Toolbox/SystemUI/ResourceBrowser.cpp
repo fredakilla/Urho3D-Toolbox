@@ -120,8 +120,8 @@ bool ResourceBrowserWindow(String& selected, bool* open)
                 break;
             }
 
-            if (ui::IsItemHovered() && ui::IsMouseDragging() && !systemUI->HasDragData())
-                systemUI->SetDragData(state->path + item);
+            /*if (ui::IsItemHovered() && ui::IsMouseDragging() && !systemUI->HasDragData())
+                systemUI->SetDragData(state->path + item);*/
         }
     }
     ui::EndDock();

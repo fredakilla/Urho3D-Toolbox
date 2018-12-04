@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2008-2018 the Urho3D project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,43 +22,49 @@
 
 #pragma once
 
-#include "Urho3D/Core/Object.h"
-#include "Urho3D/Core/Timer.h"
+#include <Urho3D/Container/FlagSet.h>
+#include <Urho3D/Core/Object.h>
+#include <Urho3D/Core/Timer.h>
 
 namespace Urho3D
 {
 
-static const unsigned DEBUGHUD_SHOW_NONE = 0x0;
-static const unsigned DEBUGHUD_SHOW_STATS = 0x1;
-static const unsigned DEBUGHUD_SHOW_MODE = 0x2;
-static const unsigned DEBUGHUD_SHOW_ALL = 0x7;
+enum DebugHudExMode : unsigned
+{
+    DEBUGHUDEX_SHOW_NONE = 0x0,
+    DEBUGHUDEX_SHOW_STATS = 0x1,
+    DEBUGHUDEX_SHOW_MODE = 0x2,
+    DEBUGHUDEX_SHOW_ALL = 0x7,
+};
+
+URHO3D_FLAGSET(DebugHudExMode, DebugHudModeFlags);
 
 /// Displays rendering stats and profiling information.
-class URHO3D_API DebugHud : public Object
+class URHO3D_API DebugHudEx : public Object
 {
-    URHO3D_OBJECT(DebugHud, Object)
+    URHO3D_OBJECT(DebugHudEx, Object)
 
 public:
     /// Construct.
-    DebugHud(Context* context);
+    explicit DebugHudEx(Context* context);
     /// Destruct.
-    ~DebugHud();
+    ~DebugHudEx() override;
 
     /// Set elements to show.
     /// \param mode is a combination of DEBUGHUD_SHOW_* flags.
-    void SetMode(unsigned mode);
+    void SetMode(DebugHudModeFlags mode);
     /// Cycle through elements
     void CycleMode();
     /// Set whether to show 3D geometry primitive/batch count only. Default false.
     void SetUseRendererStats(bool enable);
     /// Toggle elements.
     /// \param mode is a combination of DEBUGHUD_SHOW_* flags.
-    void Toggle(unsigned mode);
+    void Toggle(DebugHudModeFlags mode);
     /// Toggle all elements.
     void ToggleAll();
     /// Return currently shown elements.
     /// \return a combination of DEBUGHUD_SHOW_* flags.
-    unsigned GetMode() const { return mode_; }
+    DebugHudModeFlags GetMode() const { return mode_; }
     /// Return whether showing 3D geometry primitive/batch count only.
     bool GetUseRendererStats() const { return useRendererStats_; }
     /// Set application-specific stats.
@@ -83,10 +89,6 @@ public:
 private:
     /// Render system ui.
     void RenderUi(VariantMap& eventData);
-    /// Update positions debug hud elements. Called on intializaton or when window size changes.
-    void RecalculateWindowPositions();
-    /// Snap position to the extents of debug hud rendering rect set by SetExtents().
-    Vector2 WithinExtents(Vector2 pos);
 
     /// Hashmap containing application specific stats.
     HashMap<String, String> appStats_;
@@ -97,17 +99,13 @@ private:
     /// Show 3D geometry primitive/batch count flag.
     bool useRendererStats_;
     /// Current shown-element mode.
-    unsigned mode_;
+    DebugHudModeFlags mode_;
     /// FPS timer.
     Timer fpsTimer_;
     /// Calculated fps
     unsigned fps_;
     /// DebugHud extents that data will be rendered in.
     IntRect extents_;
-    /// Cached position (bottom-left corner) of mode information.
-    Vector2 posMode_;
-    /// Cached position (top-left corner) of stats.
-    Vector2 posStats_;
 };
 
 }

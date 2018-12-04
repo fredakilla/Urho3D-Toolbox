@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "Urho3D/Core/Object.h"
+#include <Urho3D/Core/Object.h>
 #include "SystemUI.h"
 
 namespace Urho3D

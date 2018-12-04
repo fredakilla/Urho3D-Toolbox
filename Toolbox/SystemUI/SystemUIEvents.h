@@ -22,8 +22,8 @@
 
 #pragma once
 
-#include "Urho3D/Core/Object.h"
-#include "Urho3D/UI/UIEvents.h"
+#include <Urho3D/Core/Object.h>
+#include <Urho3D/UI/UIEvents.h>
 
 
 namespace Urho3D
@@ -62,6 +62,10 @@ URHO3D_EVENT(E_GIZMONODEMODIFIED, GizmoNodeModified)
     URHO3D_PARAM(P_NODE, Node);                                  // Node pointer
     URHO3D_PARAM(P_OLDTRANSFORM, OldTransform);                  // Matrix3x4
     URHO3D_PARAM(P_NEWTRANSFORM, NewTransform);                  // Matrix3x4
+}
+
+URHO3D_EVENT(E_GIZMOSELECTIONCHANGED, GizmoSelectionChanged)
+{
 }
 
 }
