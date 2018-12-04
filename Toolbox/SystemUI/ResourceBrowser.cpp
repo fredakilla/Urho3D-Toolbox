@@ -26,7 +26,7 @@
 #include <Urho3D/Core/Context.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/IO/FileSystem.h>
-#include <IconFontCppHeaders/IconsFontAwesome.h>
+#include <IconFontCppHeaders/IconsFontAwesome5.h>
 #include "Widgets.h"
 #include "IO/ContentUtilities.h"
 
