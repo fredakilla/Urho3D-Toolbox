@@ -1,38 +1,9 @@
-//
-// Copyright (c) 2008-2017 the Urho3D project.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-//
-
-#include <Urho3D/Core/Context.h>
 #include <Urho3D/Core/CoreEvents.h>
-#include <Urho3D/IO/Log.h>
-#include <Urho3D/Scene/Component.h>
-#include <Urho3D/Scene/Node.h>
-#include <Urho3D/Scene/Scene.h>
 #include <Urho3D/Scene/SceneEvents.h>
-#include <Urho3D/UI/UI.h>
-
-#include "Common/UndoManager.h"
-#include "SystemUI/AttributeInspector.h"
-#include "SystemUI/Gizmo.h"
-#include "SystemUI/SystemUIEvents.h"
+#include <SystemUI/SystemUIEvents.h>
+#include <Toolbox/SystemUI/AttributeInspector.h>
+#include <Toolbox/SystemUI/Gizmo.h>
+#include "UndoManager.h"
 
 namespace Urho3D
 {
@@ -40,240 +11,45 @@ namespace Urho3D
 namespace Undo
 {
 
-AttributeState::AttributeState(Serializable* item, const String& name, const Variant& value)
-    : item_(item)
-    , name_(name)
-    , value_(value)
+Manager::Manager(Context* ctx)
+    : Object(ctx)
 {
-}
-
-void AttributeState::Apply()
-{
-    item_->SetAttribute(name_, value_);
-    item_->ApplyAttributes();
-}
-
-bool AttributeState::Equals(State* other) const
-{
-    auto other_ = dynamic_cast<AttributeState*>(other);
-    if (!other_)
-        return false;
-
-    if (item_ != other_->item_)
-        return false;
-
-    return value_ == other_->value_;
-}
-
-String AttributeState::ToString() const
-{
-    return Urho3D::ToString("AttributeState %s = %s", name_.CString(), value_.ToString().CString());
-}
-
-ElementParentState::ElementParentState(UIElement* item, UIElement* parent) : item_(item), parent_(parent)
-{
-    if (parent)
-        index_ = parent->FindChild(item);
-}
-
-void ElementParentState::Apply()
-{
-    if (parent_.NotNull())
-        item_->SetParent(parent_, index_);
-    else
-        item_->Remove();
-}
-
-bool ElementParentState::Equals(State* other) const
-{
-    auto other_ = dynamic_cast<ElementParentState*>(other);
-
-    if (other_ == nullptr)
-        return false;
-
-    return item_ == other_->item_ && parent_ == other_->parent_ && index_ == other_->index_;
-}
-
-String ElementParentState::ToString() const
-{
-    return Urho3D::ToString("ElementParentState parent = %p child = %p index = %d", parent_.Get(), item_.Get(), index_);
-}
-
-NodeParentState::NodeParentState(Node* item, Node* parent) : item_(item), parent_(parent)
-{
-    if (parent)
-        index_ = parent->GetChildren().IndexOf(SharedPtr<Node>(item));
-}
-
-void NodeParentState::Apply()
-{
-    if (parent_.NotNull())
-        parent_->AddChild(item_, index_);
-    else
-        item_->Remove();
-}
-
-bool NodeParentState::Equals(State* other) const
-{
-    auto other_ = dynamic_cast<NodeParentState*>(other);
-
-    if (other_ == nullptr)
-        return false;
-
-    return item_ == other_->item_ && parent_ == other_->parent_ && index_ == other_->index_;
-}
-
-String NodeParentState::ToString() const
-{
-    return Urho3D::ToString("NodeParentState parent = %p child = %p index = %d", parent_.Get(), item_.Get(), index_);
-}
-
-ComponentParentState::ComponentParentState(Component* item, Node* parent) : item_(item), parent_(parent)
-{
-    id_ = item->GetID();
-}
-
-void ComponentParentState::Apply()
-{
-    if (parent_.NotNull())
+    SubscribeToEvent(E_ENDFRAME, [this](StringHash, VariantMap&)
     {
-        if (!parent_->HasComponent(item_->GetType()))
+        if (trackingEnabled_ && !currentFrameStates_.Empty())
         {
-            parent_->AddComponent(item_, id_, LOCAL);   // Replication mode is irrelevant, because it is used only for
-                                                        // ID creation.
+            stack_.Resize(index_);              // Discard unneeded states
+            stack_.Push(currentFrameStates_);
+            index_++;
+            currentFrameStates_.Clear();
         }
-    }
-    else
-        item_->Remove();
-}
+    });
 
-bool ComponentParentState::Equals(State* other) const
-{
-    auto other_ = dynamic_cast<ComponentParentState*>(other);
-
-    if (other_ == nullptr)
-        return false;
-
-    return item_ == other_->item_ && parent_ == other_->parent_ && id_ == other_->id_;
-}
-
-String ComponentParentState::ToString() const
-{
-    return Urho3D::ToString("ComponentParentState parent = %p child = %p id = %d", parent_.Get(), item_.Get(), id_);
-}
-
-XMLVariantState::XMLVariantState(const XMLElement& item, const Variant& value) : item_(item), value_(value)
-{
-}
-
-void XMLVariantState::Apply()
-{
-    item_.SetVariant(value_);
-}
-
-bool XMLVariantState::Equals(State* other) const
-{
-    auto other_ = dynamic_cast<XMLVariantState*>(other);
-
-    if (other_ == nullptr)
-        return false;
-
-    return (item_.GetName() == other_->item_.GetName()) && (value_ == other_->value_);
-}
-
-String XMLVariantState::ToString() const
-{
-    return Urho3D::ToString("XMLVariantState value = %s", value_.ToString().CString());
-}
-
-XMLParentState::XMLParentState(const XMLElement& item, const XMLElement& parent) : item_(item), parent_(parent)
-{
-}
-
-void XMLParentState::Apply()
-{
-    if (parent_.NotNull())
-        parent_.AppendChild(item_);
-    else
-        item_.GetParent().RemoveChild(item_);
-}
-
-bool XMLParentState::Equals(State* other) const
-{
-    auto other_ = dynamic_cast<XMLParentState*>(other);
-
-    if (other_ == nullptr)
-        return false;
-
-    return item_.GetNode() == other_->item_.GetNode() && parent_.GetNode() == other_->parent_.GetNode();
-}
-
-String XMLParentState::ToString() const
-{
-    return Urho3D::ToString("XMLParentState parent = %s", parent_.IsNull() ? "null" : "set");
-}
-
-void StateCollection::Apply()
-{
-    for (auto& state : states_)
-        state->Apply();
-}
-
-bool StateCollection::Contains(State* other) const
-{
-    for (const auto& state : states_)
+    SubscribeToEvent(E_UNDO, [this](StringHash, VariantMap& args)
     {
-        if (state->Equals(other))
-            return true;
-    }
-    return false;
-}
-
-bool StateCollection::PushUnique(const SharedPtr<State>& state)
-{
-    if (!Contains(state))
-    {
-        states_.Push(state);
-        return true;
-    }
-    return false;
-}
-
-Manager::Manager(Context* ctx) : Object(ctx)
-{
-    SubscribeToEvent(E_ENDFRAME, [&](StringHash, VariantMap&)
-    {
-        if (!trackingSuspended_)
+        if (index_ > 0)
         {
-            assert(previous_.Size() == next_.Size());
-
-            if (previous_.Size())
+            // Pick a state with latest time
+            auto time = stack_[index_ - 1][0]->time_;
+            if (args[P_TIME].GetUInt() < time)
             {
-                // When stack is empty we insert two items - old state and new state. When stack already has states
-                // saved - we save old state to the state collection at the end of the stack and insert new
-                // collection for a new state.
-                if (stack_.Empty())
-                {
-                    stack_.Resize(1);
-                    index_++;
-                }
+                // Find and return undo manager with latest state recording
+                args[P_TIME] = time;
+                args[P_MANAGER] = this;
+            }
+        }
+    });
 
-                for (auto& state : previous_)
-                {
-                    if (stack_.Back().PushUnique(state))
-                        URHO3D_LOGDEBUGF("UNDO: Save %d: %s", index_, state->ToString().CString());
-                }
-
-                index_++;
-                stack_.Resize(index_ + 1);
-
-                for (auto& state : next_)
-                {
-                    if (stack_.Back().PushUnique(state))
-                        URHO3D_LOGDEBUGF("UNDO: Save %d: %s", index_, state->ToString().CString());
-                }
-                previous_.Clear();
-                next_.Clear();
+    SubscribeToEvent(E_REDO, [this](StringHash, VariantMap& args)
+    {
+        if (index_ < stack_.Size())
+        {
+            auto time = stack_[index_][0]->time_;
+            if (args[P_TIME].GetUInt() > time)
+            {
+                // Find and return undo manager with latest state recording
+                args[P_TIME] = time;
+                args[P_MANAGER] = this;
             }
         }
     });
@@ -281,192 +57,152 @@ Manager::Manager(Context* ctx) : Object(ctx)
 
 void Manager::Undo()
 {
-    ApplyStateFromStack(false);
+    bool isTracking = IsTrackingEnabled();
+    SetTrackingEnabled(false);
+    if (index_ > 0)
+    {
+        index_--;
+        const auto& actions = stack_[index_];
+        for (int i = actions.Size() - 1; i >= 0; --i)
+            actions[i]->Undo();
+    }
+    SetTrackingEnabled(isTracking);
 }
 
 void Manager::Redo()
 {
-    ApplyStateFromStack(true);
+    bool isTracking = IsTrackingEnabled();
+    SetTrackingEnabled(false);
+    if (index_ < stack_.Size())
+    {
+        for (auto& action : stack_[index_])
+            action->Redo();
+        index_++;
+    }
+    SetTrackingEnabled(isTracking);
 }
 
 void Manager::Clear()
 {
-    previous_.Clear();
-    next_.Clear();
     stack_.Clear();
-    index_ = -1;
+    currentFrameStates_.Clear();
+    index_ = 0;
 }
 
-void Manager::ApplyStateFromStack(bool forward)
-{
-    trackingSuspended_ = true;
-    int direction = forward ? 1 : -1;
-    index_ += direction;
-    if (index_ >= 0 && index_ < stack_.Size())
-    {
-        stack_[index_].Apply();
-        URHO3D_LOGDEBUGF("Undo: apply %d", index_);
-    }
-    index_ = Clamp<int32_t>(index_, 0, stack_.Size() - 1);
-    trackingSuspended_ = false;
-}
-
-void Manager::TrackState(Serializable* item, const String& name, const Variant& value, const Variant& oldValue)
-{
-    // Item has it's state already modified, manually track the change.
-    TrackBefore<AttributeState>(item, name, oldValue);
-    TrackAfter<AttributeState>(item, name, value);
-}
-
-XMLElement Manager::XMLCreate(XMLElement& parent, const String& name)
-{
-    auto element = parent.CreateChild(name);
-    TrackBefore<XMLParentState>(element);                       // "Removed" element has empty variant value.
-    TrackAfter<XMLParentState>(element, element.GetParent());   // When value is set element exists.
-    return element;
-}
-
-void Manager::XMLRemove(XMLElement& element)
-{
-    TrackBefore<XMLParentState>(element, element.GetParent());  // When value is set element exists.
-    TrackAfter<XMLParentState>(element);                        // "Removed" element has empty variant value.
-    element.Remove();
-}
-
-void Manager::XMLSetVariantValue(XMLElement& element, const Variant& value)
-{
-    TrackBefore<XMLVariantState>(element, element.GetVariant());
-    TrackAfter<XMLVariantState>(element, value);
-    element.SetVariantValue(value);
-}
-
-template<typename T, typename... Args>
-void Manager::TrackBefore(Args... args)
-{
-    previous_.Push(SharedPtr<State>(new T(args...)));
-}
-
-template<typename T, typename... Args>
-void Manager::TrackAfter(Args... args)
-{
-    next_.Push(SharedPtr<State>(new T(args...)));
-}
 void Manager::Connect(Scene* scene)
 {
-    SubscribeToEvent(scene, E_NODEADDED, [&](StringHash, VariantMap& args) {
-        if (trackingSuspended_)
+    SubscribeToEvent(scene, E_NODEADDED, [&](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
             return;
-
-        using namespace NodeRemoved;
-        auto node = dynamic_cast<Node*>(args[P_NODE].GetPtr());
-        auto parent = dynamic_cast<Node*>(args[P_PARENT].GetPtr());
-
-        TrackBefore<NodeParentState>(node, nullptr);        // Removed from the scene state
-        TrackAfter<NodeParentState>(node, parent);          // Present in the scene state
+        auto* node = dynamic_cast<Node*>(args[NodeAdded::P_NODE].GetPtr());
+        if (node->HasTag("__EDITOR_OBJECT__"))
+            return;
+        Track<CreateNodeAction>(node);
     });
 
-    SubscribeToEvent(scene, E_NODEREMOVED, [&](StringHash, VariantMap& args) {
-        if (trackingSuspended_)
+    SubscribeToEvent(scene, E_NODEREMOVED, [&](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
             return;
-
-        using namespace NodeRemoved;
-        auto node = dynamic_cast<Node*>(args[P_NODE].GetPtr());
-        auto parent = dynamic_cast<Node*>(args[P_PARENT].GetPtr());
-
-        TrackBefore<NodeParentState>(node, parent);        // Present in the scene state
-        TrackAfter<NodeParentState>(node, nullptr);        // Removed from the scene state
+        auto* node = dynamic_cast<Node*>(args[NodeRemoved::P_NODE].GetPtr());
+        if (node->HasTag("__EDITOR_OBJECT__"))
+            return;
+        Track<DeleteNodeAction>(node);
     });
 
-    SubscribeToEvent(scene, E_COMPONENTADDED, [&](StringHash, VariantMap& args) {
-        if (trackingSuspended_)
+    SubscribeToEvent(scene, E_COMPONENTADDED, [&](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
             return;
-
-        using namespace ComponentAdded;
-        auto component = dynamic_cast<Component*>(args[P_COMPONENT].GetPtr());
-        auto parent = dynamic_cast<Node*>(args[P_NODE].GetPtr());
-
-        TrackBefore<ComponentParentState>(component, nullptr);
-        TrackAfter<ComponentParentState>(component, parent);
+        auto* node = dynamic_cast<Node*>(args[ComponentAdded::P_NODE].GetPtr());
+        auto* component = dynamic_cast<Component*>(args[ComponentAdded::P_COMPONENT].GetPtr());
+        if (node->HasTag("__EDITOR_OBJECT__"))
+            return;
+        Track<CreateComponentAction>(component);
     });
 
-    SubscribeToEvent(scene, E_COMPONENTREMOVED, [&](StringHash, VariantMap& args) {
-        if (trackingSuspended_)
+    SubscribeToEvent(scene, E_COMPONENTREMOVED, [&](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
             return;
-
-        using namespace ComponentAdded;
-        auto component = dynamic_cast<Component*>(args[P_COMPONENT].GetPtr());
-        auto parent = dynamic_cast<Node*>(args[P_NODE].GetPtr());
-
-        TrackBefore<ComponentParentState>(component, parent);
-        TrackAfter<ComponentParentState>(component, nullptr);
+        auto* node = dynamic_cast<Node*>(args[ComponentRemoved::P_NODE].GetPtr());
+        auto* component = dynamic_cast<Component*>(args[ComponentRemoved::P_COMPONENT].GetPtr());
+        if (node->HasTag("__EDITOR_OBJECT__"))
+            return;
+        Track<DeleteComponentAction>(component);
     });
 }
 
 void Manager::Connect(AttributeInspector* inspector)
 {
-    SubscribeToEvent(inspector, E_ATTRIBUTEINSPECTVALUEMODIFIED, [&](StringHash, VariantMap& args) {
-        if (trackingSuspended_)
+    SubscribeToEvent(inspector, E_ATTRIBUTEINSPECTVALUEMODIFIED, [&](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
             return;
-
         using namespace AttributeInspectorValueModified;
         auto item = dynamic_cast<Serializable*>(args[P_SERIALIZABLE].GetPtr());
+        if (Node* node = dynamic_cast<Node*>(item))
+        {
+            if (node->HasTag("__EDITOR_OBJECT__"))
+                return;
+        }
 
-        auto attributeName = reinterpret_cast<AttributeInfo*>(args[P_ATTRIBUTEINFO].GetVoidPtr())->name_;
-        TrackBefore<AttributeState>(item, attributeName, args[P_OLDVALUE]);
-        TrackAfter<AttributeState>(item, attributeName, args[P_NEWVALUE]);
+        const auto& name = reinterpret_cast<AttributeInfo*>(args[P_ATTRIBUTEINFO].GetVoidPtr())->name_;
+        const auto& oldValue = args[P_OLDVALUE];
+        const auto& newValue = item->GetAttribute(name);
+        if (oldValue != newValue)
+        {
+            // Dummy attributes are used for rendering custom inspector widgets that do not map to Variant values.
+            // These dummy values are not modified, however inspector event is still useful for tapping into their
+            // modifications. State tracking for these dummy values is not needed and would introduce extra ctrl+z
+            // presses that do nothing.
+            Track<EditAttributeAction>(item, name, oldValue, newValue);
+        }
     });
 }
 
 void Manager::Connect(UIElement* root)
 {
-    SubscribeToEvent(E_ELEMENTADDED, [&, root](StringHash, VariantMap& args) {
-        if (trackingSuspended_)
+    SubscribeToEvent(E_ELEMENTADDED, [&, root](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
             return;
-
         using namespace ElementAdded;
-        auto element = dynamic_cast<UIElement*>(args[P_ELEMENT].GetPtr());
-        auto parent = dynamic_cast<UIElement*>(args[P_PARENT].GetPtr());
         auto eventRoot = dynamic_cast<UIElement*>(args[P_ROOT].GetPtr());
-
         if (root != eventRoot)
             return;
-
-        TrackBefore<ElementParentState>(element, nullptr);        // Removed from the scene state
-        TrackAfter<ElementParentState>(element, parent);          // Present in the scene state
+        Track<CreateUIElementAction>(dynamic_cast<UIElement*>(args[P_ELEMENT].GetPtr()));
     });
 
-    SubscribeToEvent(E_ELEMENTREMOVED, [&, root](StringHash, VariantMap& args) {
-        if (trackingSuspended_)
+    SubscribeToEvent(E_ELEMENTREMOVED, [&, root](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
             return;
-
         using namespace ElementRemoved;
-        auto element = dynamic_cast<UIElement*>(args[P_ELEMENT].GetPtr());
-        auto parent = dynamic_cast<UIElement*>(args[P_PARENT].GetPtr());
         auto eventRoot = dynamic_cast<UIElement*>(args[P_ROOT].GetPtr());
-
         if (root != eventRoot)
             return;
-
-        TrackBefore<ElementParentState>(element, parent);        // Removed from the scene state
-        TrackAfter<ElementParentState>(element, nullptr);        // Present in the scene state
+        Track<DeleteUIElementAction>(dynamic_cast<UIElement*>(args[P_ELEMENT].GetPtr()));
     });
 }
 
 void Manager::Connect(Gizmo* gizmo)
 {
-    SubscribeToEvent(gizmo, E_GIZMONODEMODIFIED, [&](StringHash, VariantMap& args) {
+    SubscribeToEvent(gizmo, E_GIZMONODEMODIFIED, [&](StringHash, VariantMap& args)
+    {
+        if (!trackingEnabled_)
+            return;
         using namespace GizmoNodeModified;
         auto node = dynamic_cast<Node*>(args[P_NODE].GetPtr());
-        auto oldTransform = args[P_OLDTRANSFORM].GetMatrix3x4();
-        auto newTransform = args[P_NEWTRANSFORM].GetMatrix3x4();
+        if (node->HasTag("__EDITOR_OBJECT__"))
+            return;
+        const auto& oldTransform = args[P_OLDTRANSFORM].GetMatrix3x4();
+        const auto& newTransform = args[P_NEWTRANSFORM].GetMatrix3x4();
 
-        TrackBefore<AttributeState>(node, "Position", oldTransform.Translation());
-        TrackBefore<AttributeState>(node, "Rotation", oldTransform.Rotation());
-        TrackBefore<AttributeState>(node, "Scale", oldTransform.Scale());
-
-        TrackAfter<AttributeState>(node, "Position", newTransform.Translation());
-        TrackAfter<AttributeState>(node, "Rotation", newTransform.Rotation());
-        TrackAfter<AttributeState>(node, "Scale", newTransform.Scale());
+        Track<EditAttributeAction>(node, "Position", oldTransform.Translation(), newTransform.Translation());
+        Track<EditAttributeAction>(node, "Rotation", oldTransform.Rotation(), newTransform.Rotation());
+        Track<EditAttributeAction>(node, "Scale", oldTransform.Scale(), newTransform.Scale());
     });
 }
 

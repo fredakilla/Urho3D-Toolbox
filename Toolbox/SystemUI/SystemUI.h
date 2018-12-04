@@ -31,8 +31,8 @@
 #include <Urho3D/Graphics/Texture2D.h>
 #include <Urho3D/Input/InputEvents.h>
 
-#include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
+#include <ImGui/imgui.h>
+#include <ImGui/imgui_internal.h>
 
 #include "SystemUIEvents.h"
 

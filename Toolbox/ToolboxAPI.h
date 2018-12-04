@@ -22,44 +22,51 @@
 
 #pragma once
 
+#ifdef _WIN32
 
-#include "ToolboxAPI.h"
-#include <Urho3D/Container/FlagSet.h>
-#include <Urho3D/Core/Object.h>
+#ifdef _MSC_VER
+#pragma warning(disable: 4251)
+#pragma warning(disable: 4275)
+#endif
 
+#define URHO3D_TOOLBOX_EXPORT_API __declspec(dllexport)
+
+#ifdef URHO3D_TOOLBOX_STATIC
+#  define URHO3D_TOOLBOX_API
+#  define URHO3D_TOOLBOX_NO_EXPORT
+#else
+#  ifndef URHO3D_TOOLBOX_API
+#    ifdef URHO3D_TOOLBOX_EXPORTS
+/* We are building this library */
+#      define URHO3D_TOOLBOX_API URHO3D_TOOLBOX_EXPORT_API
+#    else
+/* We are using this library */
+#      define URHO3D_TOOLBOX_API __declspec(dllimport)
+#    endif
+#  endif
+#endif
+
+#else
+
+#define URHO3D_TOOLBOX_EXPORT_API __attribute__((visibility("default")))
+
+#ifdef URHO3D_TOOLBOX_STATIC
+#ifndef URHO3D_TOOLBOX_API
+#  define URHO3D_TOOLBOX_API
+#endif
+#  define URHO3D_TOOLBOX_NO_EXPORT
+#else
+#  define URHO3D_TOOLBOX_API URHO3D_TOOLBOX_EXPORT_API
+#endif
+
+#endif
 
 namespace Urho3D
 {
 
-enum ResourceBrowserResult
-{
-    RBR_NOOP,
-    RBR_ITEM_SELECTED,
-    RBR_ITEM_OPEN,
-    RBR_ITEM_CONTEXT_MENU,
+class Context;
+
+/// Register toolbox types with the engine.
+URHO3D_TOOLBOX_API void RegisterToolboxTypes(Context* context);
+
 };
-
-enum ResourceBrowserFlag
-{
-    RBF_NONE,
-    RBF_SCROLL_TO_CURRENT = 1,
-    RBF_RENAME_CURRENT = 1 << 1,
-    RBF_DELETE_CURRENT = 1 << 2,
-};
-URHO3D_FLAGSET(ResourceBrowserFlag, ResourceBrowserFlags);
-
-URHO3D_EVENT(E_RESOURCEBROWSERRENAME, ResourceBrowserRename)
-{
-    URHO3D_PARAM(P_FROM, From);                                     // String
-    URHO3D_PARAM(P_TO, To);                                         // String
-}
-
-URHO3D_EVENT(E_RESOURCEBROWSERDELETE, ResourceBrowserDelete)
-{
-    URHO3D_PARAM(P_NAME, Name);                                     // String
-}
-
-/// Create resource browser ui inside another window.
-URHO3D_TOOLBOX_API ResourceBrowserResult ResourceBrowserWidget(String& path, String& selected, ResourceBrowserFlags flags=RBF_NONE);
-
-}

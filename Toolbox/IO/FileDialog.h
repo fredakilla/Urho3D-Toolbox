@@ -23,43 +23,22 @@
 #pragma once
 
 
-#include "ToolboxAPI.h"
-#include <Urho3D/Container/FlagSet.h>
-#include <Urho3D/Core/Object.h>
-
+#include <Urho3D/Container/Str.h>
 
 namespace Urho3D
 {
 
-enum ResourceBrowserResult
+enum FileDialogResult
 {
-    RBR_NOOP,
-    RBR_ITEM_SELECTED,
-    RBR_ITEM_OPEN,
-    RBR_ITEM_CONTEXT_MENU,
+    DIALOG_ERROR,
+    DIALOG_OK,
+    DIALOG_CANCEL
 };
 
-enum ResourceBrowserFlag
-{
-    RBF_NONE,
-    RBF_SCROLL_TO_CURRENT = 1,
-    RBF_RENAME_CURRENT = 1 << 1,
-    RBF_DELETE_CURRENT = 1 << 2,
-};
-URHO3D_FLAGSET(ResourceBrowserFlag, ResourceBrowserFlags);
-
-URHO3D_EVENT(E_RESOURCEBROWSERRENAME, ResourceBrowserRename)
-{
-    URHO3D_PARAM(P_FROM, From);                                     // String
-    URHO3D_PARAM(P_TO, To);                                         // String
-}
-
-URHO3D_EVENT(E_RESOURCEBROWSERDELETE, ResourceBrowserDelete)
-{
-    URHO3D_PARAM(P_NAME, Name);                                     // String
-}
-
-/// Create resource browser ui inside another window.
-URHO3D_TOOLBOX_API ResourceBrowserResult ResourceBrowserWidget(String& path, String& selected, ResourceBrowserFlags flags=RBF_NONE);
+URHO3D_API FileDialogResult OpenDialog(const String& filterList, const String& defaultPath, String& outPath);
+URHO3D_API FileDialogResult OpenDialogMultiple(const String& filterList, const String& defaultPath,
+                                               Vector<String>& outPaths);
+URHO3D_API FileDialogResult SaveDialog(const String& filterList, const String& defaultPath, String& outPath);
+URHO3D_API FileDialogResult PickFolder(const String& defaultPath, String& outPath);
 
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2017 the Urho3D project.
+// Copyright (c) 2018 Rokas Kupstys
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,9 +20,11 @@
 // THE SOFTWARE.
 //
 
+#include <Urho3D/IO/FileSystem.h>
+#include <Urho3D/Resource/ResourceCache.h>
+#include <Urho3D/Resource/XMLFile.h>
+#include <SystemUI/SystemUI.h>
 #include <IconFontCppHeaders/IconsFontAwesome5.h>
-#include <Urho3D/Urho3DAll.h>
-#include <Toolbox/SystemUI/SystemUI.h>
 #include "ContentUtilities.h"
 
 
@@ -33,7 +35,7 @@ const Vector<String> archiveExtensions_{".rar", ".zip", ".tar", ".gz", ".xz", ".
 const Vector<String> wordExtensions_{".doc", ".docx", ".odt"};
 const Vector<String> codeExtensions_{".c", ".cpp", ".h", ".hpp", ".hxx", ".py", ".py3", ".js", ".cs"};
 const Vector<String> imagesExtensions_{".png", ".jpg", ".jpeg", ".gif", ".ttf", ".dds", ".psd"};
-const Vector<String> textExtensions_{".xml", ".json", ".txt"};
+const Vector<String> textExtensions_{".xml", ".json", ".txt", ".yml", ".scene", ".material", ".ui", ".uistyle", ".node", ".particle"};
 const Vector<String> audioExtensions_{".waw", ".ogg", ".mp3"};
 
 FileType GetFileType(const String& fileName)
@@ -75,7 +77,7 @@ String GetFileIcon(const String& fileName)
     case FTYPE_POWERPOINT:
         return ICON_FA_FILE_POWERPOINT;
     case FTYPE_TEXT:
-        return ICON_FA_FILE_IMAGE;
+        return ICON_FA_FILE_ALT;
     case FTYPE_FILM:
         return ICON_FA_FILE_VIDEO;
     case FTYPE_AUDIO:
@@ -89,11 +91,14 @@ String GetFileIcon(const String& fileName)
 
 ContentType GetContentType(const String& resourcePath)
 {
-    SystemUI* systemUI = static_cast<SystemUI*>(ui::GetIO().UserData);
     auto extension = GetExtension(resourcePath).ToLower();
     if (extension == ".xml")
     {
-        SharedPtr<XMLFile> xml(systemUI->GetSubsystem<ResourceCache>()->GetResource<XMLFile>(resourcePath));
+        auto systemUI = (SystemUI*)ui::GetIO().UserData;
+        SharedPtr<XMLFile> xml(systemUI->GetCache()->GetResource<XMLFile>(resourcePath));
+        if (xml.Null())
+            return CTYPE_UNKNOWN;
+
         auto rootElementName = xml->GetRoot().GetName();
         if (rootElementName == "scene")
             return CTYPE_SCENE;
@@ -117,6 +122,18 @@ ContentType GetContentType(const String& resourcePath)
         return CTYPE_MODEL;
     if (extension == ".ani")
         return CTYPE_ANIMATION;
+    if (extension == ".scene")
+        return CTYPE_SCENE;
+    if (extension == ".ui")
+        return CTYPE_UILAYOUT;
+    if (extension == ".style")
+        return CTYPE_UISTYLE;
+    if (extension == ".material")
+        return CTYPE_MATERIAL;
+    if (extension == ".particle")
+        return CTYPE_PARTICLE;
+    if (extension == ".node")
+        return CTYPE_SCENEOBJECT;
     if (audioExtensions_.Contains(extension))
         return CTYPE_SOUND;
     if (imagesExtensions_.Contains(extension))
