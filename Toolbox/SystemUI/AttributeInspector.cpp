@@ -289,7 +289,7 @@ bool RenderSingleAttribute(ToolBoxObject* eventNamespace, const AttributeInfo* i
                     ui::SetTooltip("Press [Enter] to commit changes.");
             }
             if (modified)
-                value = *buffer;
+                value = *buffer->c_str();
             break;
         }
 //        case VAR_BUFFER:
@@ -487,7 +487,7 @@ bool RenderSingleAttribute(ToolBoxObject* eventNamespace, const AttributeInfo* i
                 auto* buffer = ui::GetUIState<std::string>();
                 if (ui::InputText("", buffer, ImGuiInputTextFlags_EnterReturnsTrue))
                 {
-                    v.Push(*buffer);
+                    v.Push(buffer->c_str());
                     buffer->clear();
                     modified = true;
 
@@ -535,7 +535,7 @@ bool RenderSingleAttribute(ToolBoxObject* eventNamespace, const AttributeInfo* i
                             ui::SetTooltip("Press [Enter] to commit changes.");
                     }
                     if (modified)
-                        sv = *buffer;
+                        sv = buffer->c_str();
                     ++it;
                 }
             }

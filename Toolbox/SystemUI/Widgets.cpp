@@ -249,7 +249,7 @@ bool TransformRect(Urho3D::IntRect& inOut, Urho3D::IntRect& delta, TransformSele
         /// A flag indicating type of resize action currently in progress
         TransformResizeTypeFlags resizing_ = RESIZE_NONE;
         /// A cache of system cursors
-        HashMap<TransformResizeTypeFlags, SDL_Cursor*> cursors_;
+        HashMap<unsigned, SDL_Cursor*> cursors_;
         /// Default cursor shape
         SDL_Cursor* cursorArrow_;
         /// Flag indicating that this selector set cursor handle
