@@ -55,7 +55,7 @@ protected:
 
 class URHO3D_TOOLBOX_API DebugCameraController2D : public LogicComponent
 {
-URHO3D_OBJECT(DebugCameraController2D, LogicComponent);
+    URHO3D_OBJECT(DebugCameraController2D, LogicComponent);
 public:
     /// Construct.
     explicit DebugCameraController2D(Context* context);

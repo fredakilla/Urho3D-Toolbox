@@ -21,7 +21,7 @@
 //
 
 #include "ResourceBrowser.h"
-#include <Urho3D/SystemUI/SystemUI.h>
+#include <SystemUI/SystemUI.h>
 #include <Urho3D/Core/Context.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Resource/ResourceEvents.h>
@@ -52,23 +52,25 @@ ResourceBrowserResult ResourceBrowserWidget(String& path, String& selected, Reso
     auto fs = systemUI->GetFileSystem();
     auto& state = *ui::GetUIState<State>();
 
+    Input* input = systemUI->GetInput();
+
     if (!selected.Empty() && !ui::IsAnyItemActive() && ui::IsWindowFocused())
     {
-        if (fs->GetInput()->GetKeyPress(KEY_F2) || flags & RBF_RENAME_CURRENT)
+        if (input->GetKeyPress(KEY_F2) || flags & RBF_RENAME_CURRENT)
         {
             state.isEditing = true;
             state.deletionPending = false;
             state.editStartItem = selected;
             strcpy(state.editBuffer, selected.CString());
         }
-        if (fs->GetInput()->GetKeyPress(KEY_DELETE) || flags & RBF_DELETE_CURRENT)
+        if (input->GetKeyPress(KEY_DELETE) || flags & RBF_DELETE_CURRENT)
         {
             state.isEditing = false;
             state.deletionPending = true;
             state.editStartItem = selected;
         }
     }
-    if (fs->GetInput()->GetKeyPress(KEY_ESCAPE) || state.editStartItem != selected)
+    if (input->GetKeyPress(KEY_ESCAPE) || state.editStartItem != selected)
     {
         state.isEditing = false;
         state.deletionPending = false;

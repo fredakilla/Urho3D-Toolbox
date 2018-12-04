@@ -34,6 +34,7 @@
 #include <ImGui/imgui.h>
 #include <ImGui/imgui_internal.h>
 
+#include "Common/ToolBoxObject.h"
 #include "SystemUIEvents.h"
 
 namespace Urho3D
@@ -41,7 +42,7 @@ namespace Urho3D
 
 const float SYSTEMUI_DEFAULT_FONT_SIZE = 14;
 
-class URHO3D_API SystemUI : public Object
+class URHO3D_API SystemUI : public ToolBoxObject
 {
     URHO3D_OBJECT(SystemUI, Object)
 

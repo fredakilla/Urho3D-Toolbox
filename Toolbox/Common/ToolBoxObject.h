@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Urho3D/Core/Context.h>
+#include <Urho3D/Core/Object.h>
 
 namespace Urho3D
 {
@@ -33,7 +33,7 @@ class Tasks;
 #endif
 
 
-class ToolBoxObject
+class ToolBoxObject : public Object
 {
 public:
 
@@ -76,8 +76,6 @@ public:
     Tasks* GetTasks() const;
 #endif
 
-private:
-    Context* context_;
 
 };
 

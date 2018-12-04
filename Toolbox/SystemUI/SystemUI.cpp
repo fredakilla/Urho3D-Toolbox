@@ -34,7 +34,7 @@
 #include "Console.h"
 #include <SDL/SDL.h>
 #include <ImGuizmo/ImGuizmo.h>
-#include <imgui/imgui_internal.h>
+#include <ImGui/imgui_internal.h>
 
 #define URHO3D_FALLTHROUGH
 
@@ -56,7 +56,7 @@ static Vector3 systemUiScale{Vector3::ONE};
 static Vector3 systemUiScalePixelPerfect{Vector3::ONE};
 
 SystemUI::SystemUI(Urho3D::Context* context)
-    : Object(context)
+    : ToolBoxObject(context)
     , vertexBuffer_(context)
     , indexBuffer_(context)
 {

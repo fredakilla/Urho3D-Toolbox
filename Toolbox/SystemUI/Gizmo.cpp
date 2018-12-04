@@ -32,7 +32,7 @@
 #include <Urho3D/Graphics/AnimatedModel.h>
 #include <Urho3D/Graphics/DebugRenderer.h>
 #include <Urho3D/IO/Log.h>
-#include <Urho3D/SystemUI/SystemUI.h>
+#include <SystemUI/SystemUI.h>
 #include <Urho3D/Graphics/Light.h>
 #include <ImGui/imgui_internal.h>
 #include <ImGuizmo/ImGuizmo.h>

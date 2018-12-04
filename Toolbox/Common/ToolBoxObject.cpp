@@ -5,9 +5,9 @@
 namespace Urho3D
 {
 
-ToolBoxObject::ToolBoxObject(Context* context)
+ToolBoxObject::ToolBoxObject(Context* context) :
+    Object(context)
 {
-    context_ = context;
 }
 
 Engine* ToolBoxObject::GetEngine() const

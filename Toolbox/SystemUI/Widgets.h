@@ -26,8 +26,8 @@
 #include <typeinfo>
 #include <ImGui/imgui.h>
 #include <Urho3D/Math/Rect.h>
-#include <Urho3D/Core/Utils.h>
-#include "Urho3D/SystemUI/SystemUI.h"
+#include "Utils.h"
+#include "SystemUI/SystemUI.h"
 
 
 namespace ImGui
@@ -42,6 +42,11 @@ enum TransformSelector
 };
 
 }
+
+/// Enable enum for using in FlagSet and declare FlagSet specialization for enums in custom namespaces. Shall be called within global namespace.
+#define URHO3D_FLAGSET_EX(nameSpace, enumName, flagsetName)                             \
+    namespace Urho3D { URHO3D_ENABLE_FLAGSET(nameSpace::enumName); }                    \
+    namespace nameSpace { using flagsetName = Urho3D::FlagSet<nameSpace::enumName>; }   \
 
 URHO3D_FLAGSET_EX(ImGui, TransformSelector, TransformSelectorFlags);
 

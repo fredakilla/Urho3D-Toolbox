@@ -22,7 +22,7 @@
 
 #include <limits>
 
-#include <Urho3D/SystemUI/SystemUI.h>
+#include <SystemUI/SystemUI.h>
 #include <Urho3D/Core/StringUtils.h>
 #include <Urho3D/Core/CoreEvents.h>
 #include <Urho3D/Scene/Serializable.h>
@@ -42,7 +42,7 @@
 
 #include <IconFontCppHeaders/IconsFontAwesome5.h>
 #include <ImGui/imgui_internal.h>
-#include <ImGui/imgui_stdlib.h>
+#include <ImGui/misc/cpp/imgui_stdlib.h>
 #include <Urho3D/Graphics/StaticModel.h>
 #include <Urho3D/Graphics/Octree.h>
 #include <Urho3D/Graphics/Graphics.h>
@@ -113,7 +113,7 @@ static const float buttonWidth()
     return 26_dpx;  // TODO: this should not exist
 }
 
-bool RenderResourceRef(Object* eventNamespace, StringHash type, const String& name, String& result)
+bool RenderResourceRef(ToolBoxObject* eventNamespace, StringHash type, const String& name, String& result)
 {
     SharedPtr<Resource> resource;
     auto returnValue = false;
@@ -161,7 +161,7 @@ bool RenderResourceRef(Object* eventNamespace, StringHash type, const String& na
     return returnValue;
 }
 
-bool RenderSingleAttribute(Object* eventNamespace, const AttributeInfo* info, Variant& value)
+bool RenderSingleAttribute(ToolBoxObject* eventNamespace, const AttributeInfo* info, Variant& value)
 {
     const float floatMin = -std::numeric_limits<float>::infinity();
     const float floatMax = std::numeric_limits<float>::infinity();
@@ -577,7 +577,7 @@ bool RenderSingleAttribute(Object* eventNamespace, const AttributeInfo* info, Va
     return modified;
 }
 
-bool RenderAttributes(Serializable* item, const char* filter, Object* eventNamespace)
+bool RenderAttributes(Serializable* item, const char* filter, ToolBoxObject* eventNamespace)
 {
     if (item->GetNumAttributes() == 0)
         return false;

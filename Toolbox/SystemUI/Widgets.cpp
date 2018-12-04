@@ -25,7 +25,7 @@
 #include <Urho3D/Core/Context.h>
 #include <Urho3D/Input/Input.h>
 #include <SDL/SDL_scancode.h>
-#include <Urho3D/SystemUI/SystemUI.h>
+#include <SystemUI/SystemUI.h>
 
 using namespace Urho3D;
 using namespace ui::litterals;
