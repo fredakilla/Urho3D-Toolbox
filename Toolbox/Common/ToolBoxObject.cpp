@@ -1,6 +1,7 @@
 #include "ToolBoxObject.h"
 #include <Urho3D/Urho3DAll.h>
 #include "SystemUI/SystemUI.h"
+#include "WorkQueueEx.h"
 
 namespace Urho3D
 {
@@ -20,9 +21,9 @@ Time* ToolBoxObject::GetTime() const
     return context_->GetSubsystem<Time>();
 }
 
-WorkQueue* ToolBoxObject::GetWorkQueue() const
+WorkQueueEx *ToolBoxObject::GetWorkQueue() const
 {
-    return context_->GetSubsystem<WorkQueue>();
+    return context_->GetSubsystem<WorkQueueEx>();
 }
 
 FileSystem* ToolBoxObject::GetFileSystem() const

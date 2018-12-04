@@ -30,6 +30,7 @@
 #include "Editor.h"
 #include "AssetConverter.h"
 #include "ImportAssimp.h"
+#include "Common/WorkQueueEx.h"
 
 
 namespace Urho3D
@@ -84,23 +85,21 @@ String AssetConverter::GetCachePath() const
 }
 void AssetConverter::VerifyCacheAsync()
 {
-    //@@GetWorkQueue()->AddWorkItem([=]() {
-    //@@    for (const auto& watcher : watchers_)
-    //@@    {
-    //@@        Vector<String> files;
-    //@@        GetFileSystem()->ScanDir(files, watcher->GetPath(), "*", SCAN_FILES, true);
-    //@@
-    //@@        for (const auto& file : files)
-    //@@            ConvertAsset(file);
-    //@@    }
-    //@@});
-    assert(0);
+    GetWorkQueue()->AddWorkItem([=]() {
+        for (const auto& watcher : watchers_)
+        {
+            Vector<String> files;
+            GetFileSystem()->ScanDir(files, watcher->GetPath(), "*", SCAN_FILES, true);
+
+            for (const auto& file : files)
+                ConvertAsset(file);
+        }
+    });
 }
 
 void AssetConverter::ConvertAssetAsync(const String& resourceName)
 {
-    //@@GetWorkQueue()->AddWorkItem(std::bind(&AssetConverter::ConvertAsset, this, resourceName));
-    assert(0);
+    GetWorkQueue()->AddWorkItem(std::bind(&AssetConverter::ConvertAsset, this, resourceName));
 }
 
 bool AssetConverter::ConvertAsset(const String& resourceName)

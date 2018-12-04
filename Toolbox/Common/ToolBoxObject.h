@@ -9,7 +9,7 @@ class Context;
 class EventHandler;
 class Engine;
 class Time;
-class WorkQueue;
+class WorkQueueEx;
 #if URHO3D_PROFILING
 class Profiler;
 #endif
@@ -44,7 +44,7 @@ public:
     /// Return time subsystem.
     Time* GetTime() const;
     /// Return work queue subsystem.
-    WorkQueue* GetWorkQueue() const;
+    WorkQueueEx* GetWorkQueue() const;
     /// Return file system subsystem.
     FileSystem* GetFileSystem() const;
 #if URHO3D_LOGGING

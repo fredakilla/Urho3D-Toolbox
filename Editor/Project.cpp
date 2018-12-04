@@ -126,7 +126,7 @@ bool Project::LoadProject(const String& projectPath)
     GetSubsystem<ResourceCache>()->AddResourceDir(GetResourcePath(), 1);
     assetConverter_.SetCachePath(GetCachePath());
     assetConverter_.AddAssetDirectory(GetResourcePath());
-    assetConverter_.VerifyCacheAsync();
+    //@@assetConverter_.VerifyCacheAsync();
 
     // Unregister engine dirs
     auto enginePrefixPath = GetSubsystem<Editor>()->GetCoreResourcePrefixPath();

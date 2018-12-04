@@ -46,6 +46,7 @@
 #include "Tabs/PreviewTab.h"
 #include "Assets/AssetConverter.h"
 #include "Assets/Inspector/MaterialInspector.h"
+#include "Common/WorkQueueEx.h"
 
 using namespace ui::litterals;
 
@@ -125,7 +126,10 @@ void Editor::Start()
     context_->RegisterFactory<InspectorTab>();
     context_->RegisterFactory<ResourceTab>();
     context_->RegisterFactory<PreviewTab>();
+    context_->RegisterFactory<WorkQueueEx>();
     context_->RegisterSubsystem(new SystemUI(context_));
+
+    context_->RegisterSubsystem(new WorkQueue(context_));
 
     Inspectable::Material::RegisterObject(context_);
 

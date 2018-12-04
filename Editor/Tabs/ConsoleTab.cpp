@@ -39,7 +39,7 @@ bool ConsoleTab::RenderWindowContent()
     auto font = GetSubsystem<Editor>()->GetMonoSpaceFont();
     if (font)
         ui::PushFont(font);
-    GetSubsystem<ConsoleEx>()->RenderContent();
+    //@@GetSubsystem<ConsoleEx>()->RenderContent();
     if (font)
         ui::PopFont();
     return true;
