@@ -99,17 +99,17 @@ protected:
 };
 
 /// A dummy object used as namespace for subscribing to events.
-class URHO3D_TOOLBOX_API AttributeInspector : public Object
+class URHO3D_TOOLBOX_API AttributeInspector : public ToolBoxObject
 {
-    URHO3D_OBJECT(AttributeInspector, Object);
+    URHO3D_OBJECT(AttributeInspector, ToolBoxObject);
 public:
-    explicit AttributeInspector(Context* context) : Object(context) { }
+    explicit AttributeInspector(Context* context) : ToolBoxObject(context) { }
 };
 
 /// Render attribute inspector of `item`.
 /// If `filter` is not null then only attributes containing this substring will be rendered.
 /// If `eventNamespace` is not null then this object will be used to send events.
-URHO3D_TOOLBOX_API bool RenderAttributes(Serializable* item, const char* filter=nullptr, Object* eventNamespace=nullptr);
+URHO3D_TOOLBOX_API bool RenderAttributes(Serializable* item, const char* filter=nullptr, ToolBoxObject* eventNamespace=nullptr);
 URHO3D_TOOLBOX_API bool RenderSingleAttribute(Variant& value);
 
 }

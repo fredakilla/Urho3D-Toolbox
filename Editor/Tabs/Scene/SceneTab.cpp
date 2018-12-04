@@ -82,8 +82,8 @@ SceneTab::SceneTab(Context* context)
     rootElement_->SetEnabled(true);
 
     offScreenUI_ = new UI(context_);
-    offScreenUI_->SetRoot(rootElement_);
-    offScreenUI_->SetRenderInSystemUI(true);
+    //@@offScreenUI_->SetRoot(rootElement_);
+    //@@offScreenUI_->SetRenderInSystemUI(true);
     offScreenUI_->SetBlockEvents(true);
     context_->RegisterSubsystem(offScreenUI_);
 
@@ -112,7 +112,8 @@ SceneTab::SceneTab(Context* context)
                 {
                     auto setRenderPathToViewport = [this, renderPathFile](Viewport* viewport)
                     {
-                        if (!viewport->SetRenderPath(renderPathFile))
+                        viewport->SetRenderPath(renderPathFile);
+                        if (!viewport->GetRenderPath())
                             return;
 
                         RenderPath* path = viewport->GetRenderPath();
@@ -218,8 +219,11 @@ bool SceneTab::RenderWindowContent()
     if (GetInput()->IsMouseVisible())
         mouseHoversViewport_ = ui::IsItemHovered();
 
-    bool isClickedLeft = GetInput()->GetMouseButtonClick(MOUSEB_LEFT) && ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
-    bool isClickedRight = GetInput()->GetMouseButtonClick(MOUSEB_RIGHT) && ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+    //@@bool isClickedLeft = GetInput()->GetMouseButtonClick(MOUSEB_LEFT) && ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+    //@@bool isClickedRight = GetInput()->GetMouseButtonClick(MOUSEB_RIGHT) && ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+    bool isClickedLeft = GetInput()->GetMouseButtonDown(MOUSEB_LEFT) && ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+    bool isClickedRight = GetInput()->GetMouseButtonDown(MOUSEB_RIGHT) && ui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+
 
     // Render camera preview
     if (cameraPreviewViewport_->GetCamera() != nullptr)
@@ -567,10 +571,10 @@ void SceneTab::RenderToolbarButtons()
     }
     ui::SameLine(0, 3.f);
 
-    if (auto* hud = GetSubsystem<DebugHud>())
+    if (auto* hud = GetSubsystem<DebugHudEx>())
     {
-        if (ui::EditorToolbarButton(ICON_FA_BUG, "Display debug hud.", hud->GetMode() == DEBUGHUD_SHOW_ALL))
-            hud->SetMode(hud->GetMode() == DEBUGHUD_SHOW_ALL ? DEBUGHUD_SHOW_NONE : DEBUGHUD_SHOW_ALL);
+        if (ui::EditorToolbarButton(ICON_FA_BUG, "Display debug hud.", hud->GetMode() == DEBUGHUDEX_SHOW_ALL))
+            hud->SetMode(hud->GetMode() == DEBUGHUDEX_SHOW_ALL ? DEBUGHUDEX_SHOW_NONE : DEBUGHUDEX_SHOW_ALL);
     }
 
     ui::SameLine(0, 3.f);
@@ -856,7 +860,7 @@ IntRect SceneTab::UpdateViewRect()
     ResizeMainViewport(tabRect);
     gizmo_.SetScreenRect(tabRect);
 
-    if (auto* hud = GetSubsystem<DebugHud>())
+    if (auto* hud = GetSubsystem<DebugHudEx>())
         hud->SetExtents(tabRect.Min(), tabRect.Size());
 
     return tabRect;

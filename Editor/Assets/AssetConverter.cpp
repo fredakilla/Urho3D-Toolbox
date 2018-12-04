@@ -84,21 +84,23 @@ String AssetConverter::GetCachePath() const
 }
 void AssetConverter::VerifyCacheAsync()
 {
-    GetWorkQueue()->AddWorkItem([=]() {
-        for (const auto& watcher : watchers_)
-        {
-            Vector<String> files;
-            GetFileSystem()->ScanDir(files, watcher->GetPath(), "*", SCAN_FILES, true);
-
-            for (const auto& file : files)
-                ConvertAsset(file);
-        }
-    });
+    //@@GetWorkQueue()->AddWorkItem([=]() {
+    //@@    for (const auto& watcher : watchers_)
+    //@@    {
+    //@@        Vector<String> files;
+    //@@        GetFileSystem()->ScanDir(files, watcher->GetPath(), "*", SCAN_FILES, true);
+    //@@
+    //@@        for (const auto& file : files)
+    //@@            ConvertAsset(file);
+    //@@    }
+    //@@});
+    assert(0);
 }
 
 void AssetConverter::ConvertAssetAsync(const String& resourceName)
 {
-    GetWorkQueue()->AddWorkItem(std::bind(&AssetConverter::ConvertAsset, this, resourceName));
+    //@@GetWorkQueue()->AddWorkItem(std::bind(&AssetConverter::ConvertAsset, this, resourceName));
+    assert(0);
 }
 
 bool AssetConverter::ConvertAsset(const String& resourceName)

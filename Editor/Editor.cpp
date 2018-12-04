@@ -125,6 +125,7 @@ void Editor::Start()
     context_->RegisterFactory<InspectorTab>();
     context_->RegisterFactory<ResourceTab>();
     context_->RegisterFactory<PreviewTab>();
+    context_->RegisterSubsystem(new SystemUI(context_));
 
     Inspectable::Material::RegisterObject(context_);
 
@@ -160,8 +161,8 @@ void Editor::Start()
         {
             CloseProject();
             // Reset SystemUI so that imgui loads it's config proper.
-            context_->RemoveSubsystem<SystemUI>();
-            context_->RegisterSubsystem(new SystemUI(context_));
+            //@@context_->RemoveSubsystem<SystemUI>();
+            //@@context_->RegisterSubsystem(new SystemUI(context_));
             SetupSystemUI();
 
             project_ = new Project(context_);

@@ -22,7 +22,7 @@
 
 #include <Urho3D/IO/Log.h>
 #include <Urho3D/Resource/ResourceCache.h>
-#include <Urho3D/SystemUI/SystemUI.h>
+#include <SystemUI/SystemUI.h>
 #include <Toolbox/SystemUI/Widgets.h>
 #include "EditorIconCache.h"
 #include "Widgets.h"

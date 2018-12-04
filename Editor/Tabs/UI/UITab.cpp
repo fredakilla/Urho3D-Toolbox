@@ -56,8 +56,8 @@ UITab::UITab(Context* context)
     rootElement_->SetEnabled(true);
 
     offScreenUI_ = new UI(context_);
-    offScreenUI_->SetRoot(rootElement_);
-    offScreenUI_->SetRenderTarget(texture_, Color::BLACK);
+    //@@offScreenUI_->SetRoot(rootElement_);
+    //@@offScreenUI_->SetRenderTarget(texture_, Color::BLACK);
 
     undo_.Connect(rootElement_);
     undo_.Connect(&inspector_);
